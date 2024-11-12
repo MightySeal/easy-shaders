@@ -55,11 +55,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 @SuppressLint("RestrictedApi")
-class DefaultSurfaceProcessor @JvmOverloads internal constructor(
+class DefaultSurfaceProcessor(
     dynamicRange: DynamicRange,
     shaderProviderOverrides: MutableMap<InputFormat?, ShaderProvider> = Collections.emptyMap<InputFormat?, ShaderProvider>()
-) :
-    SurfaceProcessorInternal, OnFrameAvailableListener {
+) : SurfaceProcessorInternal, OnFrameAvailableListener {
+
     private val mGlRenderer: OpenGlRenderer
 
     @VisibleForTesting
@@ -73,7 +73,8 @@ class DefaultSurfaceProcessor @JvmOverloads internal constructor(
     private val mSurfaceOutputMatrix = FloatArray(16)
 
     // Map of current set of available outputs. Only access this on GL thread.
-    /* synthetic access */private val mOutputSurfaces: MutableMap<SurfaceOutput, Surface> = LinkedHashMap()
+    /* synthetic access */
+    private val mOutputSurfaces: MutableMap<SurfaceOutput, Surface> = LinkedHashMap()
 
     // Only access this on GL thread.
     private var mInputSurfaceCount = 0
@@ -131,7 +132,7 @@ class DefaultSurfaceProcessor @JvmOverloads internal constructor(
                 }
                 mGlRenderer.setInputFormat(inputFormat)
             }
-            surfaceRequest.provideSurface(surface, mGlExecutor) { result: SurfaceRequest.Result? ->
+            surfaceRequest.provideSurface(surface, mGlExecutor) { _: SurfaceRequest.Result? ->
                 surfaceRequest.clearTransformationInfoListener()
                 surfaceTexture.setOnFrameAvailableListener(null)
                 surfaceTexture.release()
@@ -152,9 +153,7 @@ class DefaultSurfaceProcessor @JvmOverloads internal constructor(
             return
         }
         executeSafely({
-            val surface = surfaceOutput.getSurface(
-                mGlExecutor
-            ) { event: SurfaceOutput.Event? ->
+            val surface = surfaceOutput.getSurface(mGlExecutor) { _: SurfaceOutput.Event? ->
                 surfaceOutput.close()
                 val removedSurface = mOutputSurfaces.remove(surfaceOutput)
                 if (removedSurface != null) {
