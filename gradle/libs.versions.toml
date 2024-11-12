@@ -11,6 +11,8 @@ composeBom = "2024.10.01"
 appcompat = "1.7.0"
 material = "1.12.0"
 cameraxVersion = "1.5.0-alpha03"
+autoValue = "1.6.3"
+concurrent = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +33,9 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraxVersion" }
+autoValue = { group = "com.google.auto.value", name="auto-value", version.ref = "autoValue" }
+autoValueAnnotations = { group = "com.google.auto.value", name="auto-value-annotations", version.ref = "autoValue" }
+androidx-concurrent-ktx = { group = "androidx.concurrent", name ="concurrent-futures-ktx", version.ref="concurrent" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
