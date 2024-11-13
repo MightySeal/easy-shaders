@@ -16,6 +16,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { setUrl("https://androidx.dev/snapshots/builds/11723120/artifacts/repository") }
     }
 }
 
