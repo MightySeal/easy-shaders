@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.easyshaders.data.processor.DefaultCameraEffect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,8 +48,6 @@ class CameraViewModel @Inject constructor(
         .setResolutionSelector(resolutionSelector)
         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
         .build()
-
-
 
     fun startPreview(
         lifecycleOwner: LifecycleOwner,
@@ -102,7 +101,9 @@ class CameraViewModel @Inject constructor(
             camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 activeCameraSelector,
-                useCaseGroupBuilder.build(),
+                useCaseGroupBuilder
+                    .addEffect(DefaultCameraEffect.create())
+                    .build(),
             )
             viewFinderState.value.cameraState = CameraState.READY
         }

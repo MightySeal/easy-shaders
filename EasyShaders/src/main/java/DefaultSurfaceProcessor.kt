@@ -64,7 +64,7 @@ class DefaultSurfaceProcessor(
 
     @VisibleForTesting
     val mGlThread: HandlerThread = HandlerThread(CameraXThreads.TAG + "GL Thread")
-    private val mGlExecutor: Executor
+    internal val mGlExecutor: Executor
 
     @VisibleForTesting
     val mGlHandler: Handler
@@ -440,7 +440,7 @@ class DefaultSurfaceProcessor(
      */
     object Factory {
         private var sSupplier =
-            Function<DynamicRange, SurfaceProcessorInternal> { dynamicRange: DynamicRange ->
+            Function<DynamicRange, DefaultSurfaceProcessor> { dynamicRange: DynamicRange ->
                 DefaultSurfaceProcessor(
                     dynamicRange
                 )
@@ -449,7 +449,7 @@ class DefaultSurfaceProcessor(
         /**
          * Creates a new [DefaultSurfaceProcessor] with no-op shader.
          */
-        fun newInstance(dynamicRange: DynamicRange): SurfaceProcessorInternal {
+        fun newInstance(dynamicRange: DynamicRange): DefaultSurfaceProcessor {
             return sSupplier.apply(dynamicRange)
         }
 
@@ -458,7 +458,7 @@ class DefaultSurfaceProcessor(
          */
         @VisibleForTesting
         fun setSupplier(
-            supplier: Function<DynamicRange, SurfaceProcessorInternal>
+            supplier: Function<DynamicRange, DefaultSurfaceProcessor>
         ) {
             sSupplier = supplier
         }
