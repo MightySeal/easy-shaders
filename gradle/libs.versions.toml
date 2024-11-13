@@ -1,6 +1,8 @@
 [versions]
 agp = "8.7.2"
-kotlin = "2.0.0"
+kotlin = "2.0.21"
+ksp = "2.0.21-1.0.27"
+concurrent = "1.2.0"
 coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -11,8 +13,11 @@ composeBom = "2024.10.01"
 appcompat = "1.7.0"
 material = "1.12.0"
 cameraxVersion = "1.5.0-alpha03"
+cameraViewfinderCompose = "1.0.0-SNAPSHOT"
+accompanist = "0.36.0"
+hilt = "2.52"
+hiltNavigationCompose = "1.2.0"
 autoValue = "1.6.3"
-concurrent = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,8 +36,21 @@ androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+accompanist-painter = { group = "com.google.accompanist", name = "accompanist-drawablepainter", version.ref = "accompanist" }
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
+concurrent-kts = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version.ref = "concurrent" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraxVersion" }
+camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraxVersion" }
+camera-extensions = { group = "androidx.camera", name = "camera-extensions", version.ref = "cameraxVersion" }
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraxVersion" }
+camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraxVersion" }
+camera-viewfinder-compose = { module = "androidx.camera:camera-viewfinder-compose", version.ref = "cameraViewfinderCompose" }
+
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
 autoValue = { group = "com.google.auto.value", name="auto-value", version.ref = "autoValue" }
 autoValueAnnotations = { group = "com.google.auto.value", name="auto-value-annotations", version.ref = "autoValue" }
 androidx-concurrent-ktx = { group = "androidx.concurrent", name ="concurrent-futures-ktx", version.ref="concurrent" }
@@ -42,4 +60,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
