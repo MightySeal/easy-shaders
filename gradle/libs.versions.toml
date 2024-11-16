@@ -38,7 +38,6 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 accompanist-painter = { group = "com.google.accompanist", name = "accompanist-drawablepainter", version.ref = "accompanist" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
-concurrent-kts = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version.ref = "concurrent" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraxVersion" }
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraxVersion" }

@@ -67,7 +67,7 @@ class CameraViewModel @Inject constructor(
             var extensionsCameraSelector: CameraSelector? = null
             val useCaseGroupBuilder = UseCaseGroup.Builder()
 
-            previewUseCase.setSurfaceProvider(surfaceProvider)
+            previewUseCase.surfaceProvider = surfaceProvider
             useCaseGroupBuilder.addUseCase(previewUseCase)
 
             if (captureMode == CaptureMode.PHOTO) {
@@ -138,5 +138,5 @@ enum class CameraState {
 enum class CaptureMode {
     PHOTO,
     // VIDEO_READY,
-    VIDEO_RECORDING,
+    // VIDEO_RECORDING,
 }
