@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalPermissionsApi::class)
 
-package io.easyshaders.camera
+package io.easyshaders.legacy
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

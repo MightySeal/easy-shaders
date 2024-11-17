@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.easyshaders.camera
+package io.easyshaders.legacy
 
 import android.content.Context
 import androidx.camera.lifecycle.ProcessCameraProvider
