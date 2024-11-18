@@ -7,7 +7,7 @@ import androidx.concurrent.futures.CallbackToFutureAdapter
 // https://github.com/A-Star100/A-Star100-AUG2-2024/blob/a041b416cc0b599dfee86ef1224aa846ce1a4093/DoodleNow-SRC/DoodleNow%20Decompiled/sources/androidx/camera/core/processing/AutoValue_DefaultSurfaceProcessor_PendingSnapshot.java#L6
 
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-internal class AutoValue_DefaultSurfaceProcessor_PendingSnapshot(
+internal class AutoValueDefaultSurfaceProcessorPendingSnapshot(
     /* access modifiers changed from: package-private */
     override val jpegQuality: Int,
     /* access modifiers changed from: package-private */
