@@ -26,7 +26,7 @@ class DefaultCameraEffect private constructor(
         fun create(): DefaultCameraEffect {
             val processor = DefaultSurfaceProcessor.Factory.newInstance(DynamicRange.SDR)
 
-            return DefaultCameraEffect(processor.mGlExecutor, processor)
+            return DefaultCameraEffect(processor.glExecutor, processor)
         }
     }
 }
