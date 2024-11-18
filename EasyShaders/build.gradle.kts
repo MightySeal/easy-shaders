@@ -23,4 +23,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation(libs.androidx.concurrent.ktx)
+    implementation(libs.autoValueAnnotations)
+    compileOnly(libs.autoValue)
 }

@@ -13,6 +13,8 @@ composeBom = "2024.10.01"
 appcompat = "1.7.0"
 material = "1.12.0"
 cameraxVersion = "1.5.0-alpha03"
+autoValue = "1.6.3"
+concurrent = "1.2.0"
 cameraViewfinderCompose = "1.0.0-SNAPSHOT"
 accompanist = "0.36.0"
 hilt = "2.52"
@@ -40,6 +42,11 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 concurrent-kts = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version.ref = "concurrent" }
 
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraxVersion" }
+
+autoValue = { group = "com.google.auto.value", name="auto-value", version.ref = "autoValue" }
+autoValueAnnotations = { group = "com.google.auto.value", name="auto-value-annotations", version.ref = "autoValue" }
+androidx-concurrent-ktx = { group = "androidx.concurrent", name ="concurrent-futures-ktx", version.ref="concurrent" }
+
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraxVersion" }
 camera-extensions = { group = "androidx.camera", name = "camera-extensions", version.ref = "cameraxVersion" }
 camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraxVersion" }
