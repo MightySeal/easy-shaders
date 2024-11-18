@@ -35,6 +35,7 @@ import androidx.core.util.Preconditions
 
 import com.google.auto.value.AutoValue
 import com.google.common.util.concurrent.ListenableFuture
+import io.easyshaders.data.processor.utils.TAG
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -60,30 +61,30 @@ class DefaultSurfaceProcessor(
     shaderProviderOverrides: MutableMap<InputFormat?, ShaderProvider> = Collections.emptyMap<InputFormat?, ShaderProvider>()
 ) : SurfaceProcessorInternal, OnFrameAvailableListener {
 
-    private val mGlRenderer: OpenGlRenderer
+    private val openGlRenderer: OpenGlRenderer
 
     @VisibleForTesting
-    val mGlThread: HandlerThread = HandlerThread(CameraXThreads.TAG + "GL Thread")
-    private val mGlExecutor: Executor
+    val glThread: HandlerThread = HandlerThread(CameraXThreads.TAG + "GL Thread")
+    private val glExecutor: Executor
 
     @VisibleForTesting
-    val mGlHandler: Handler
-    private val mIsReleaseRequested = AtomicBoolean(false)
-    private val mTextureMatrix = FloatArray(16)
-    private val mSurfaceOutputMatrix = FloatArray(16)
+    val handler: Handler
+    private val isReleaseRequested = AtomicBoolean(false)
+    private val textureMatrix = FloatArray(16)
+    private val surfaceOutputMatrix = FloatArray(16)
 
     // Map of current set of available outputs. Only access this on GL thread.
     /* synthetic access */
-    private val mOutputSurfaces: MutableMap<SurfaceOutput, Surface> = LinkedHashMap()
+    private val outputSurfaces: MutableMap<SurfaceOutput, Surface> = LinkedHashMap()
 
     // Only access this on GL thread.
-    private var mInputSurfaceCount = 0
+    private var inputSurfaceCount = 0
 
     // Only access this on GL thread.
-    private var mIsReleased = false
+    private var isReleased = false
 
     // Only access this on GL thread.
-    private val mPendingSnapshots: MutableList<PendingSnapshot> = ArrayList()
+    private val pendingSnapshots: MutableList<PendingSnapshot> = ArrayList()
 
     /**
      * Constructs [DefaultSurfaceProcessor] with custom shaders.
@@ -94,10 +95,10 @@ class DefaultSurfaceProcessor(
      */
     /** Constructs [DefaultSurfaceProcessor] with default shaders.  */
     init {
-        mGlThread.start()
-        mGlHandler = Handler(mGlThread.looper)
-        mGlExecutor = CameraXExecutors.newHandlerExecutor(mGlHandler)
-        mGlRenderer = OpenGlRenderer()
+        glThread.start()
+        handler = Handler(glThread.looper)
+        glExecutor = CameraXExecutors.newHandlerExecutor(handler)
+        openGlRenderer = OpenGlRenderer()
         try {
             initGlRenderer(dynamicRange, shaderProviderOverrides)
         } catch (e: RuntimeException) {
@@ -106,62 +107,55 @@ class DefaultSurfaceProcessor(
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
-
     override fun onInputSurface(surfaceRequest: SurfaceRequest) {
-        if (mIsReleaseRequested.get()) {
+        if (isReleaseRequested.get()) {
             surfaceRequest.willNotProvideSurface()
             return
         }
         executeSafely({
-            mInputSurfaceCount++
-            val surfaceTexture = SurfaceTexture(mGlRenderer.textureName)
+            inputSurfaceCount++
+            val surfaceTexture = SurfaceTexture(openGlRenderer.textureName)
             surfaceTexture.setDefaultBufferSize(
                 surfaceRequest.resolution.width,
                 surfaceRequest.resolution.height
             )
             val surface = Surface(surfaceTexture)
-            surfaceRequest.setTransformationInfoListener(mGlExecutor) { transformationInfo: SurfaceRequest.TransformationInfo ->
+            surfaceRequest.setTransformationInfoListener(glExecutor) { transformationInfo: SurfaceRequest.TransformationInfo ->
                 var inputFormat = InputFormat.DEFAULT
                 if (surfaceRequest.dynamicRange.is10BitHdr
                     && transformationInfo.hasCameraTransform()
                 ) {
                     inputFormat = InputFormat.YUV
                 }
-                mGlRenderer.setInputFormat(inputFormat)
+                openGlRenderer.setInputFormat(inputFormat)
             }
-            surfaceRequest.provideSurface(surface, mGlExecutor) { _: SurfaceRequest.Result? ->
+            surfaceRequest.provideSurface(surface, glExecutor) { _: SurfaceRequest.Result? ->
                 surfaceRequest.clearTransformationInfoListener()
                 surfaceTexture.setOnFrameAvailableListener(null)
                 surfaceTexture.release()
                 surface.release()
-                mInputSurfaceCount--
+                inputSurfaceCount--
                 checkReadyToRelease()
             }
-            surfaceTexture.setOnFrameAvailableListener(this, mGlHandler)
+            surfaceTexture.setOnFrameAvailableListener(this, handler)
         }, { surfaceRequest.willNotProvideSurface() })
     }
 
-    /**
-     * {@inheritDoc}
-     */
     override fun onOutputSurface(surfaceOutput: SurfaceOutput) {
-        if (mIsReleaseRequested.get()) {
+        if (isReleaseRequested.get()) {
             surfaceOutput.close()
             return
         }
         executeSafely({
-            val surface = surfaceOutput.getSurface(mGlExecutor) { _: SurfaceOutput.Event? ->
+            val surface = surfaceOutput.getSurface(glExecutor) { _: SurfaceOutput.Event? ->
                 surfaceOutput.close()
-                val removedSurface = mOutputSurfaces.remove(surfaceOutput)
+                val removedSurface = outputSurfaces.remove(surfaceOutput)
                 if (removedSurface != null) {
-                    mGlRenderer.unregisterOutputSurface(removedSurface)
+                    openGlRenderer.unregisterOutputSurface(removedSurface)
                 }
             }
-            mGlRenderer.registerOutputSurface(surface)
-            mOutputSurfaces[surfaceOutput] = surface
+            openGlRenderer.registerOutputSurface(surface)
+            outputSurfaces[surfaceOutput] = surface
         }, { surfaceOutput.close() })
     }
 
@@ -169,11 +163,11 @@ class DefaultSurfaceProcessor(
      * Release the [DefaultSurfaceProcessor].
      */
     override fun release() {
-        if (mIsReleaseRequested.getAndSet(true)) {
+        if (isReleaseRequested.getAndSet(true)) {
             return
         }
         executeSafely({
-            mIsReleased = true
+            isReleased = true
             checkReadyToRelease()
         })
     }
@@ -189,7 +183,7 @@ class DefaultSurfaceProcessor(
                     rotationDegrees, completer
                 )
             executeSafely(
-                { mPendingSnapshots.add(pendingSnapshot) },
+                { pendingSnapshots.add(pendingSnapshot) },
                 {
                     completer.setException(
                         java.lang.Exception(
@@ -201,26 +195,23 @@ class DefaultSurfaceProcessor(
         })
     }
 
-    /**
-     * {@inheritDoc}
-     */
     override fun onFrameAvailable(surfaceTexture: SurfaceTexture) {
-        if (mIsReleaseRequested.get()) {
+        if (isReleaseRequested.get()) {
             // Ignore frame update if released.
             return
         }
         surfaceTexture.updateTexImage()
-        surfaceTexture.getTransformMatrix(mTextureMatrix)
+        surfaceTexture.getTransformMatrix(textureMatrix)
         // Surface, size and transform matrix for JPEG Surface if exists
         var jpegOutput: Triple<Surface, Size, FloatArray>? = null
 
-        for ((surfaceOutput, surface) in mOutputSurfaces) {
-            surfaceOutput.updateTransformMatrix(mSurfaceOutputMatrix, mTextureMatrix)
+        for ((surfaceOutput, surface) in outputSurfaces) {
+            surfaceOutput.updateTransformMatrix(surfaceOutputMatrix, textureMatrix)
             if (surfaceOutput.format == ImageFormatConstants.INTERNAL_DEFINED_IMAGE_FORMAT_PRIVATE) {
                 // Render GPU output directly.
                 try {
-                    mGlRenderer.render(
-                        surfaceTexture.timestamp, mSurfaceOutputMatrix,
+                    openGlRenderer.render(
+                        surfaceTexture.timestamp, surfaceOutputMatrix,
                         surface
                     )
                 } catch (e: RuntimeException) {
@@ -236,7 +227,7 @@ class DefaultSurfaceProcessor(
                 Preconditions.checkState(jpegOutput == null, "Only one JPEG output is supported.")
                 jpegOutput = Triple(
                     surface, surfaceOutput.size,
-                    mSurfaceOutputMatrix.clone()
+                    surfaceOutputMatrix.clone()
                 )
             }
         }
@@ -257,7 +248,7 @@ class DefaultSurfaceProcessor(
      */
     @WorkerThread
     private fun takeSnapshotAndDrawJpeg(jpegOutput: Triple<Surface, Size, FloatArray>?) {
-        if (mPendingSnapshots.isEmpty()) {
+        if (pendingSnapshots.isEmpty()) {
             // No pending snapshot requests, do nothing.
             return
         }
@@ -275,7 +266,7 @@ class DefaultSurfaceProcessor(
                 var jpegQuality = -1
                 var rotationDegrees = -1
                 var bitmap: Bitmap? = null
-                val iterator = mPendingSnapshots.iterator()
+                val iterator = pendingSnapshots.iterator()
                 while (iterator.hasNext()) {
                     val pendingSnapshot = iterator.next()
                     // Take a new snapshot if the rotation is different.
@@ -310,10 +301,10 @@ class DefaultSurfaceProcessor(
     }
 
     private fun failAllPendingSnapshots(throwable: Throwable) {
-        for (pendingSnapshot in mPendingSnapshots) {
+        for (pendingSnapshot in pendingSnapshots) {
             pendingSnapshot.completer?.setException(throwable)
         }
-        mPendingSnapshots.clear()
+        pendingSnapshots.clear()
     }
 
     private fun getBitmap(
@@ -333,24 +324,24 @@ class DefaultSurfaceProcessor(
         val newSize = TransformUtils.rotateSize(size, rotationDegrees)
 
         // Take a snapshot Bitmap and compress it to JPEG.
-        return mGlRenderer.snapshot(newSize, snapshotTransform)
+        return openGlRenderer.snapshot(newSize, snapshotTransform)
     }
 
     @WorkerThread
     private fun checkReadyToRelease() {
-        if (mIsReleased && mInputSurfaceCount == 0) {
+        if (isReleased && inputSurfaceCount == 0) {
             // Once release is called, we can stop sending frame to output surfaces.
-            for (surfaceOutput in mOutputSurfaces.keys) {
+            for (surfaceOutput in outputSurfaces.keys) {
                 surfaceOutput.close()
             }
-            for (pendingSnapshot in mPendingSnapshots) {
+            for (pendingSnapshot in pendingSnapshots) {
                 pendingSnapshot.completer?.setException(
                     Exception("Failed to snapshot: DefaultSurfaceProcessor is released.")
                 )
             }
-            mOutputSurfaces.clear()
-            mGlRenderer.release()
-            mGlThread.quit()
+            outputSurfaces.clear()
+            openGlRenderer.release()
+            glThread.quit()
         }
     }
 
@@ -362,7 +353,7 @@ class DefaultSurfaceProcessor(
             CallbackToFutureAdapter.Resolver<Void> { completer: CallbackToFutureAdapter.Completer<Void?> ->
                 executeSafely({
                     try {
-                        mGlRenderer.init(dynamicRange, shaderProviderOverrides)
+                        openGlRenderer.init(dynamicRange, shaderProviderOverrides)
                         completer.set(null)
                     } catch (e: RuntimeException) {
                         completer.setException(e)
@@ -393,8 +384,8 @@ class DefaultSurfaceProcessor(
 
     private fun executeSafely(runnable: Runnable, onFailure: Runnable = Runnable {}) {
         try {
-            mGlExecutor.execute {
-                if (mIsReleased) {
+            glExecutor.execute {
+                if (isReleased) {
                     onFailure.run()
                 } else {
                     runnable.run()
@@ -424,8 +415,8 @@ class DefaultSurfaceProcessor(
                 @IntRange(from = 0, to = 100) jpegQuality: Int,
                 @IntRange(from = 0, to = 359) rotationDegrees: Int,
                 completer: CallbackToFutureAdapter.Completer<Void?>
-            ): AutoValue_DefaultSurfaceProcessor_PendingSnapshot {
-                return AutoValue_DefaultSurfaceProcessor_PendingSnapshot(
+            ): AutoValueDefaultSurfaceProcessorPendingSnapshot {
+                return AutoValueDefaultSurfaceProcessorPendingSnapshot(
                     jpegQuality, rotationDegrees, completer
                 )
             }
@@ -439,7 +430,7 @@ class DefaultSurfaceProcessor(
      *  This is for working around the limit that OpenGL cannot be initialized in unit tests.
      */
     object Factory {
-        private var sSupplier =
+        private var provider =
             Function<DynamicRange, SurfaceProcessorInternal> { dynamicRange: DynamicRange ->
                 DefaultSurfaceProcessor(
                     dynamicRange
@@ -450,21 +441,17 @@ class DefaultSurfaceProcessor(
          * Creates a new [DefaultSurfaceProcessor] with no-op shader.
          */
         fun newInstance(dynamicRange: DynamicRange): SurfaceProcessorInternal {
-            return sSupplier.apply(dynamicRange)
+            return provider.apply(dynamicRange)
         }
 
         /**
-         * Overrides the [DefaultSurfaceProcessor] supplier for testing.
+         * Overrides the [DefaultSurfaceProcessor] provider for testing.
          */
         @VisibleForTesting
-        fun setSupplier(
-            supplier: Function<DynamicRange, SurfaceProcessorInternal>
+        fun setProvider(
+            provider: Function<DynamicRange, SurfaceProcessorInternal>
         ) {
-            sSupplier = supplier
+            this.provider = provider
         }
-    }
-
-    companion object {
-        private const val TAG = "DefaultSurfaceProcessor"
     }
 }
