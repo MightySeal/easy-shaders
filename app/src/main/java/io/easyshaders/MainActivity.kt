@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint
-import io.easyshaders.camera.Camera
+import io.easyshaders.legacy.LegacyCameraScreen
 import io.easyshaders.ui.theme.EasyShadersTheme
 
 @AndroidEntryPoint
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             EasyShadersTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Camera(
+                    LegacyCameraScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)

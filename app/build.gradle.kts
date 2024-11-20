@@ -41,10 +41,16 @@ android {
     }
 }
 
+kotlin {
+    sourceSets.all {
+        languageSettings.enableLanguageFeature("ExplicitBackingFields")
+    }
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.concurrent.kts)
+    implementation(libs.androidx.concurrent.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
