@@ -15,7 +15,6 @@
  */
 package io.easyshaders.lib.processing
 
-import android.graphics.Bitmap
 import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
@@ -25,23 +24,19 @@ import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.util.Log
-import android.util.Size
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import androidx.camera.core.ImageProcessingUtil
-import androidx.core.util.Pair
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.GLUtils
-import io.easyshaders.lib.processing.util.GLUtils.Program2D
-import io.easyshaders.lib.processing.util.GLUtils.SamplerShaderProgram
 import io.easyshaders.lib.processing.util.GraphicDeviceInfo
 import io.easyshaders.lib.processing.util.OutputSurface
+import io.easyshaders.lib.processing.util.Program2D
+import io.easyshaders.lib.processing.util.SamplerShaderProgram
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 import java.lang.RuntimeException
-import java.nio.ByteBuffer
 import java.util.Objects
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGL10
@@ -56,21 +51,21 @@ import javax.microedition.khronos.egl.EGL10
  */
 @WorkerThread
 class OpenGlRenderer {
-    protected val mInitialized: AtomicBoolean = AtomicBoolean(false)
-    protected val mOutputSurfaceMap: MutableMap<Surface?, OutputSurface> = mutableMapOf<Surface?, OutputSurface>()
-    protected var mGlThread: Thread? = null
-    protected var mEglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
-    protected var mEglContext: EGLContext = EGL14.EGL_NO_CONTEXT
+    protected val isInitialized: AtomicBoolean = AtomicBoolean(false)
+    protected val outputSurfaceMap: MutableMap<Surface, OutputSurface> = mutableMapOf()
+    protected var glThread: Thread? = null
+    protected var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
+    protected var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
     // protected var mSurfaceAttrib: IntArray = intArrayOf(EGL14.EGL_NONE)
-    protected var mSurfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
-    protected var mEglConfig: EGLConfig? = null
-    protected var mTempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
-    protected var mCurrentSurface: Surface? = null
-    protected var mProgramHandles: MutableMap<InputFormat?, Program2D?> = mutableMapOf<InputFormat?, Program2D?>() // TODO: clarify nulls?
-    protected var mCurrentProgram: Program2D? = null
-    protected var mCurrentInputformat: InputFormat = InputFormat.UNKNOWN
+    protected var surfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
+    protected var eglConfig: EGLConfig? = null
+    protected var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+    protected var currentSurface: Surface? = null
+    protected var programHandles: MutableMap<InputFormat, Program2D> = mutableMapOf()
+    protected var currentProgram: Program2D? = null
+    protected var currentInputformat: InputFormat = InputFormat.UNKNOWN
 
-    private var mExternalTextureId = -1
+    private var externalTextureId = -1
 
     /**
      * Initializes the OpenGLRenderer
@@ -100,31 +95,31 @@ class OpenGlRenderer {
     @JvmOverloads
     fun init(
         dynamicRange: DynamicRange,
-        shaderOverrides: MutableMap<InputFormat?, ShaderProvider?> = mutableMapOf<InputFormat?, ShaderProvider?>()
+        shaderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
     ): GraphicDeviceInfo {
         var dynamicRange = dynamicRange
-        GLUtils.checkInitializedOrThrow(mInitialized, false)
-        val infoBuilder = GraphicDeviceInfo.builder()
+        GLUtils.checkInitializedOrThrow(isInitialized, false)
+        val infoBuilder = GraphicDeviceInfo.Builder()
         try {
             if (dynamicRange.is10BitHdrBackport) {
                 val extensions = getExtensionsBeforeInitialized(dynamicRange)
-                val glExtensions = checkNotNull<String>(extensions.first)
-                val eglExtensions = checkNotNull<String>(extensions.second)
+                val (glExtensions, eglExtensions) = extensions
+
                 if (!glExtensions.contains("GL_EXT_YUV_target")) {
                     Log.w(TAG, "Device does not support GL_EXT_YUV_target. Fallback to SDR.")
                     dynamicRange = DynamicRange.SDR
                 }
-                mSurfaceAttrib = GLUtils.chooseSurfaceAttrib(eglExtensions, dynamicRange)
+                surfaceAttrib = GLUtils.chooseSurfaceAttrib(eglExtensions, dynamicRange)
                 infoBuilder.setGlExtensions(glExtensions)
                 infoBuilder.setEglExtensions(eglExtensions)
             }
             createEglContext(dynamicRange, infoBuilder)
             createTempSurface()
-            makeCurrent(mTempSurface)
+            makeCurrent(tempSurface)
             infoBuilder.setGlVersion(GLUtils.getGlVersionNumber())
-            mProgramHandles = GLUtils.createPrograms(dynamicRange, shaderOverrides)
-            mExternalTextureId = GLUtils.createTexture()
-            useAndConfigureProgramWithTexture(mExternalTextureId)
+            programHandles = GLUtils.createPrograms(dynamicRange, shaderOverrides)
+            externalTextureId = GLUtils.createTexture()
+            useAndConfigureProgramWithTexture(externalTextureId)
         } catch (e: IllegalStateException) {
             releaseInternal()
             throw e
@@ -132,8 +127,8 @@ class OpenGlRenderer {
             releaseInternal()
             throw e
         }
-        mGlThread = Thread.currentThread()
-        mInitialized.set(true)
+        glThread = Thread.currentThread()
+        isInitialized.set(true)
         return infoBuilder.build()
     }
 
@@ -143,10 +138,10 @@ class OpenGlRenderer {
      * @throws IllegalStateException if the caller doesn't run on the GL thread.
      */
     fun release() {
-        if (!mInitialized.getAndSet(false)) {
+        if (!isInitialized.getAndSet(false)) {
             return
         }
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkGlThreadOrThrow(glThread)
         releaseInternal()
     }
 
@@ -157,11 +152,11 @@ class OpenGlRenderer {
      * on the GL thread.
      */
     fun registerOutputSurface(surface: Surface) {
-        GLUtils.checkInitializedOrThrow(mInitialized, true)
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
 
-        if (!mOutputSurfaceMap.containsKey(surface)) {
-            mOutputSurfaceMap.put(surface, GLUtils.NO_OUTPUT_SURFACE)
+        if (!outputSurfaceMap.containsKey(surface)) {
+            outputSurfaceMap.put(surface, GLUtils.NO_OUTPUT_SURFACE)
         }
     }
 
@@ -172,8 +167,8 @@ class OpenGlRenderer {
      * on the GL thread.
      */
     fun unregisterOutputSurface(surface: Surface) {
-        GLUtils.checkInitializedOrThrow(mInitialized, true)
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
 
         removeOutputSurfaceInternal(surface, true)
     }
@@ -186,10 +181,10 @@ class OpenGlRenderer {
      * on the GL thread.
      */
     fun getTextureName(): Int {
-        GLUtils.checkInitializedOrThrow(mInitialized, true)
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
 
-        return mExternalTextureId
+        return externalTextureId
     }
 
     /**
@@ -203,12 +198,12 @@ class OpenGlRenderer {
      * on the GL thread.
      */
     fun setInputFormat(inputFormat: InputFormat) {
-        GLUtils.checkInitializedOrThrow(mInitialized, true)
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
 
-        if (mCurrentInputformat != inputFormat) {
-            mCurrentInputformat = inputFormat
-            useAndConfigureProgramWithTexture(mExternalTextureId)
+        if (currentInputformat != inputFormat) {
+            currentInputformat = inputFormat
+            useAndConfigureProgramWithTexture(externalTextureId)
         }
     }
 
@@ -231,8 +226,8 @@ class OpenGlRenderer {
         timestampNs: Long, textureTransform: FloatArray,
         surface: Surface
     ) {
-        GLUtils.checkInitializedOrThrow(mInitialized, true)
-        GLUtils.checkGlThreadOrThrow(mGlThread)
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
 
         var outputSurface: OutputSurface? = getOutSurfaceOrThrow(surface)
 
@@ -243,19 +238,19 @@ class OpenGlRenderer {
                 return
             }
 
-            mOutputSurfaceMap.put(surface, outputSurface)
+            outputSurfaceMap.put(surface, outputSurface)
         }
 
         // Set output surface.
-        if (surface !== mCurrentSurface) {
-            makeCurrent(outputSurface!!.getEglSurface())
-            mCurrentSurface = surface
-            GLES20.glViewport(0, 0, outputSurface.getWidth(), outputSurface.getHeight())
-            GLES20.glScissor(0, 0, outputSurface.getWidth(), outputSurface.getHeight())
+        if (surface !== currentSurface) {
+            makeCurrent(outputSurface!!.eglSurface)
+            currentSurface = surface
+            GLES20.glViewport(0, 0, outputSurface.width, outputSurface.height)
+            GLES20.glScissor(0, 0, outputSurface.width, outputSurface.height)
         }
 
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
-        val program = checkNotNull<Program2D>(mCurrentProgram)
+        val program = checkNotNull<Program2D>(currentProgram)
         if (program is SamplerShaderProgram) {
             // Copy the texture transformation matrix over.
             program.updateTextureMatrix(textureTransform)
@@ -266,10 +261,10 @@ class OpenGlRenderer {
         GLUtils.checkGlErrorOrThrow("glDrawArrays")
 
         // Set timestamp
-        EGLExt.eglPresentationTimeANDROID(mEglDisplay, outputSurface!!.getEglSurface(), timestampNs)
+        EGLExt.eglPresentationTimeANDROID(eglDisplay, outputSurface!!.eglSurface, timestampNs)
 
         // Swap buffer
-        if (!EGL14.eglSwapBuffers(mEglDisplay, outputSurface.getEglSurface())) {
+        if (!EGL14.eglSwapBuffers(eglDisplay, outputSurface.eglSurface)) {
             Log.w(
                 TAG, "Failed to swap buffers with EGL error: 0x" + Integer.toHexString(
                     EGL14.eglGetError()
@@ -282,16 +277,16 @@ class OpenGlRenderer {
     // Returns a pair of GL extension (first) and EGL extension (second) strings.
     private fun getExtensionsBeforeInitialized(
         dynamicRangeToInitialize: DynamicRange
-    ): Pair<String?, String?> {
-        GLUtils.checkInitializedOrThrow(mInitialized, false)
+    ): Pair<String, String> {
+        GLUtils.checkInitializedOrThrow(isInitialized, false)
         try {
             createEglContext(dynamicRangeToInitialize,  /*infoBuilder=*/null)
             createTempSurface()
-            makeCurrent(mTempSurface)
+            makeCurrent(tempSurface)
             // eglMakeCurrent() has to be called before checking GL_EXTENSIONS.
             val glExtensions = GLES20.glGetString(GLES20.GL_EXTENSIONS)
-            val eglExtensions = EGL14.eglQueryString(mEglDisplay, EGL14.EGL_EXTENSIONS)
-            return Pair<String?, String?>(
+            val eglExtensions = EGL14.eglQueryString(eglDisplay, EGL14.EGL_EXTENSIONS)
+            return Pair(
                 if (glExtensions != null) glExtensions else "", if (eglExtensions != null)
                     eglExtensions
                 else
@@ -299,7 +294,7 @@ class OpenGlRenderer {
             )
         } catch (e: IllegalStateException) {
             Log.w(TAG, "Failed to get GL or EGL extensions: " + e.message, e)
-            return Pair<String?, String?>("", "")
+            return Pair("", "")
         } finally {
             releaseInternal()
         }
@@ -309,11 +304,11 @@ class OpenGlRenderer {
         dynamicRange: DynamicRange,
         infoBuilder: GraphicDeviceInfo.Builder?
     ) {
-        mEglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
-        check(mEglDisplay != EGL14.EGL_NO_DISPLAY) { "Unable to get EGL14 display" }
+        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+        check(eglDisplay != EGL14.EGL_NO_DISPLAY) { "Unable to get EGL14 display" }
         val version = IntArray(2)
-        if (!EGL14.eglInitialize(mEglDisplay, version, 0, version, 1)) {
-            mEglDisplay = EGL14.EGL_NO_DISPLAY
+        if (!EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) {
+            eglDisplay = EGL14.EGL_NO_DISPLAY
             throw IllegalStateException("Unable to initialize EGL14")
         }
 
@@ -348,7 +343,7 @@ class OpenGlRenderer {
         val numConfigs = IntArray(1)
         check(
             EGL14.eglChooseConfig(
-                mEglDisplay, attribToChooseConfig, 0, configs, 0, configs.size,
+                eglDisplay, attribToChooseConfig, 0, configs, 0, configs.size,
                 numConfigs, 0
             )
         ) { "Unable to find a suitable EGLConfig" }
@@ -358,25 +353,25 @@ class OpenGlRenderer {
             EGL14.EGL_NONE
         )
         val context = EGL14.eglCreateContext(
-            mEglDisplay, config, EGL14.EGL_NO_CONTEXT,
+            eglDisplay, config, EGL14.EGL_NO_CONTEXT,
             attribToCreateContext, 0
         )
         GLUtils.checkEglErrorOrThrow("eglCreateContext")
-        mEglConfig = config
-        mEglContext = context
+        eglConfig = config
+        eglContext = context
 
         // Confirm with query.
         val values = IntArray(1)
         EGL14.eglQueryContext(
-            mEglDisplay, mEglContext, EGL14.EGL_CONTEXT_CLIENT_VERSION, values,
+            eglDisplay, eglContext, EGL14.EGL_CONTEXT_CLIENT_VERSION, values,
             0
         )
         Log.d(TAG, "EGLContext created, client version " + values[0])
     }
 
     private fun createTempSurface() {
-        mTempSurface = GLUtils.createPBufferSurface(
-            mEglDisplay, Objects.requireNonNull<EGLConfig?>(mEglConfig),  /*width=*/1,  /*height=*/
+        tempSurface = GLUtils.createPBufferSurface(
+            eglDisplay, requireNotNull(eglConfig),  /*width=*/1,  /*height=*/
             1
         )
     }
@@ -384,23 +379,23 @@ class OpenGlRenderer {
     protected fun makeCurrent(eglSurface: EGLSurface) {
         check(
             EGL14.eglMakeCurrent(
-                mEglDisplay,
+                eglDisplay,
                 eglSurface,
                 eglSurface,
-                mEglContext
+                eglContext
             )
         ) { "eglMakeCurrent failed" }
     }
 
     protected fun useAndConfigureProgramWithTexture(textureId: Int) {
-        val program = mProgramHandles.get(mCurrentInputformat)
-        checkNotNull(program) { "Unable to configure program for input format: " + mCurrentInputformat }
-        if (mCurrentProgram !== program) {
-            mCurrentProgram = program
-            mCurrentProgram!!.use()
+        val program = programHandles.get(currentInputformat)
+        checkNotNull(program) { "Unable to configure program for input format: " + currentInputformat }
+        if (currentProgram !== program) {
+            currentProgram = program
+            currentProgram!!.use()
             Log.d(
-                TAG, ("Using program for input format " + mCurrentInputformat + ": "
-                        + mCurrentProgram)
+                TAG, ("Using program for input format " + currentInputformat + ": "
+                        + currentProgram)
             )
         }
 
@@ -410,67 +405,67 @@ class OpenGlRenderer {
 
     private fun releaseInternal() {
         // Delete program
-        for (program in mProgramHandles.values) {
+        for (program in programHandles.values) {
             program.delete()
         }
-        mProgramHandles = mutableMapOf<InputFormat?, Program2D?>()
-        mCurrentProgram = null
+        programHandles = mutableMapOf<InputFormat, Program2D>()
+        currentProgram = null
 
-        if (mEglDisplay != EGL14.EGL_NO_DISPLAY) {
+        if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
             EGL14.eglMakeCurrent(
-                mEglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
+                eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE,
                 EGL14.EGL_NO_CONTEXT
             )
 
             // Destroy EGLSurfaces
-            for (outputSurface in mOutputSurfaceMap.values) {
-                if (outputSurface.getEglSurface() != EGL14.EGL_NO_SURFACE) {
-                    if (!EGL14.eglDestroySurface(mEglDisplay, outputSurface.getEglSurface())) {
+            for (outputSurface in outputSurfaceMap.values) {
+                if (outputSurface.eglSurface != EGL14.EGL_NO_SURFACE) {
+                    if (!EGL14.eglDestroySurface(eglDisplay, outputSurface.eglSurface)) {
                         GLUtils.checkEglErrorOrLog("eglDestroySurface")
                     }
                 }
             }
-            mOutputSurfaceMap.clear()
+            outputSurfaceMap.clear()
 
             // Destroy temp surface
-            if (mTempSurface != EGL14.EGL_NO_SURFACE) {
-                EGL14.eglDestroySurface(mEglDisplay, mTempSurface)
-                mTempSurface = EGL14.EGL_NO_SURFACE
+            if (tempSurface != EGL14.EGL_NO_SURFACE) {
+                EGL14.eglDestroySurface(eglDisplay, tempSurface)
+                tempSurface = EGL14.EGL_NO_SURFACE
             }
 
             // Destroy EGLContext and terminate display
-            if (mEglContext != EGL14.EGL_NO_CONTEXT) {
-                EGL14.eglDestroyContext(mEglDisplay, mEglContext)
-                mEglContext = EGL14.EGL_NO_CONTEXT
+            if (eglContext != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglDestroyContext(eglDisplay, eglContext)
+                eglContext = EGL14.EGL_NO_CONTEXT
             }
             EGL14.eglReleaseThread()
-            EGL14.eglTerminate(mEglDisplay)
-            mEglDisplay = EGL14.EGL_NO_DISPLAY
+            EGL14.eglTerminate(eglDisplay)
+            eglDisplay = EGL14.EGL_NO_DISPLAY
         }
 
         // Reset other members
-        mEglConfig = null
-        mExternalTextureId = -1
-        mCurrentInputformat = InputFormat.UNKNOWN
-        mCurrentSurface = null
-        mGlThread = null
+        eglConfig = null
+        externalTextureId = -1
+        currentInputformat = InputFormat.UNKNOWN
+        currentSurface = null
+        glThread = null
     }
 
     protected fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
-        checkState(
-            mOutputSurfaceMap.containsKey(surface),
-            "The surface is not registered."
+        check(
+            outputSurfaceMap.containsKey(surface),
+            { "The surface is not registered." }
         )
 
-        return Objects.requireNonNull<OutputSurface?>(mOutputSurfaceMap.get(surface))
+        return outputSurfaceMap.getValue(surface)
     }
 
     protected fun createOutputSurfaceInternal(surface: Surface): OutputSurface? {
         var eglSurface: EGLSurface?
         try {
             eglSurface = GLUtils.createWindowSurface(
-                mEglDisplay, Objects.requireNonNull<EGLConfig?>(mEglConfig), surface,
-                mSurfaceAttrib
+                eglDisplay, Objects.requireNonNull<EGLConfig?>(eglConfig), surface,
+                surfaceAttrib
             )
         } catch (e: IllegalStateException) {
             Log.w(TAG, "Failed to create EGL surface: " + e.message, e)
@@ -480,29 +475,29 @@ class OpenGlRenderer {
             return null
         }
 
-        val size = GLUtils.getSurfaceSize(mEglDisplay, eglSurface)
-        return OutputSurface.of(eglSurface, size.getWidth(), size.getHeight())
+        val size = GLUtils.getSurfaceSize(eglDisplay, eglSurface)
+        return OutputSurface.of(eglSurface, size.width, size.height)
     }
 
     protected fun removeOutputSurfaceInternal(surface: Surface, unregister: Boolean) {
         // Unmake current surface.
-        if (mCurrentSurface === surface) {
-            mCurrentSurface = null
-            makeCurrent(mTempSurface)
+        if (currentSurface === surface) {
+            currentSurface = null
+            makeCurrent(tempSurface)
         }
 
         // Remove cached EGL surface.
         var removedOutputSurface: OutputSurface?
         if (unregister) {
-            removedOutputSurface = mOutputSurfaceMap.remove(surface)
+            removedOutputSurface = outputSurfaceMap.remove(surface)
         } else {
-            removedOutputSurface = mOutputSurfaceMap.put(surface, GLUtils.NO_OUTPUT_SURFACE)
+            removedOutputSurface = outputSurfaceMap.put(surface, GLUtils.NO_OUTPUT_SURFACE)
         }
 
         // Destroy EGL surface.
         if (removedOutputSurface != null && removedOutputSurface !== GLUtils.NO_OUTPUT_SURFACE) {
             try {
-                EGL14.eglDestroySurface(mEglDisplay, removedOutputSurface.getEglSurface())
+                EGL14.eglDestroySurface(eglDisplay, removedOutputSurface.eglSurface)
             } catch (e: RuntimeException) {
                 Log.w(TAG, "Failed to destroy EGL surface: " + e.message, e)
             }

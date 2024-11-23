@@ -15,97 +15,41 @@
  */
 package io.easyshaders.lib.processing.util
 
-import androidx.annotation.RestrictTo
-import com.google.auto.value.AutoValue
+data class GraphicDeviceInfo(
+    val glVersion: String, // Returns [GLUtils.VERSION_UNKNOWN] if version information can't be retrieved.
+    val eglVersion: String, // Returns [GLUtils.VERSION_UNKNOWN] if version information can't be retrieved.
+    val glExtensions: String,
+    val eglExtensions: String,
+) {
+    class Builder() {
+        private var glVersion: String = GLUtils.VERSION_UNKNOWN
+        private var eglVersion: String = GLUtils.VERSION_UNKNOWN
+        private var glExtensions: String = ""
+        private var eglExtensions: String = ""
 
-/**
- * Information about an initialized graphics device.
- *
- *
- * This information can be used to determine which version or extensions of OpenGL and EGL
- * are supported on the device to ensure the attached output surface will have expected
- * characteristics.
- */
-@AutoValue
-abstract class GraphicDeviceInfo  // Should not be instantiated directly
-internal constructor() {
-    /**
-     * Returns the OpenGL version this graphics device has been initialized to.
-     *
-     *
-     * The version is in the form &lt;major&gt;.&lt;minor&gt;.
-     *
-     *
-     * Returns [GLUtils.VERSION_UNKNOWN] if version information can't be
-     * retrieved.
-     */
-    abstract fun getGlVersion(): String
+        fun setGlVersion(version: String): Builder {
+            glVersion = version
+            return this
+        }
 
-    /**
-     * Returns the EGL version this graphics device has been initialized to.
-     *
-     *
-     * The version is in the form &lt;major&gt;.&lt;minor&gt;.
-     *
-     *
-     * Returns [GLUtils.VERSION_UNKNOWN] if version information can't be
-     * retrieved.
-     */
-    abstract fun getEglVersion(): String
+        fun setEglVersion(version: String): Builder {
+            eglVersion = version
+            return this
+        }
 
-    /**
-     * Returns a space separated list of OpenGL extensions or an empty string if extensions
-     * could not be retrieved.
-     */
-    abstract fun getGlExtensions(): String
+        fun setGlExtensions(extensions: String): Builder {
+            glExtensions = extensions
+            return this
+        }
 
-    /**
-     * Returns a space separated list of EGL extensions or an empty string if extensions
-     * could not be retrieved.
-     */
-    abstract fun getEglExtensions(): String
+        fun setEglExtensions(extensions: String): Builder {
+            eglExtensions = extensions
+            return this
+        }
 
-    /**
-     * Builder for [GraphicDeviceInfo].
-     */
-    @AutoValue.Builder
-    abstract class Builder {
-        /**
-         * Sets the gl version.
-         */
-        abstract fun setGlVersion(version: String): Builder
-
-        /**
-         * Sets the egl version.
-         */
-        abstract fun setEglVersion(version: String): Builder
-
-        /**
-         * Sets the gl extensions.
-         */
-        abstract fun setGlExtensions(extensions: String): Builder
-
-        /**
-         * Sets the egl extensions.
-         */
-        abstract fun setEglExtensions(extensions: String): Builder
-
-        /**
-         * Builds the [GraphicDeviceInfo].
-         */
-        abstract fun build(): GraphicDeviceInfo
-    }
-
-    companion object {
-        /**
-         * Returns the Builder.
-         */
-        fun builder(): Builder {
-            return AutoValue_GraphicDeviceInfo.Builder()
-                .setGlVersion(GLUtils.VERSION_UNKNOWN)
-                .setEglVersion(GLUtils.VERSION_UNKNOWN)
-                .setGlExtensions("")
-                .setEglExtensions("")
+        fun build(): GraphicDeviceInfo {
+            return GraphicDeviceInfo(glVersion, eglVersion, glExtensions, eglExtensions)
         }
     }
 }
+

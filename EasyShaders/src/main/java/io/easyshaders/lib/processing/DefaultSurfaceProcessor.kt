@@ -1,6 +1,5 @@
 package io.easyshaders.lib.processing
 
-import android.graphics.Bitmap
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.graphics.SurfaceTexture.OnFrameAvailableListener
@@ -9,35 +8,22 @@ import android.os.HandlerThread
 import android.util.Log
 import android.util.Size
 import android.view.Surface
-import androidx.annotation.IntRange
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
 import androidx.arch.core.util.Function
-import androidx.camera.core.CameraXThreads
 import androidx.camera.core.DynamicRange
-import androidx.camera.core.ImageProcessingUtil
 import androidx.camera.core.SurfaceOutput
-// import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.impl.ImageFormatConstants
-import androidx.camera.core.impl.utils.MatrixExt
-import androidx.camera.core.impl.utils.TransformUtils
 import androidx.camera.core.impl.utils.executor.CameraXExecutors
-import androidx.camera.core.impl.utils.futures.Futures
 import androidx.camera.core.processing.SurfaceProcessorInternal
 import androidx.concurrent.futures.CallbackToFutureAdapter
-import androidx.core.util.Preconditions
 
-import com.google.auto.value.AutoValue
 import com.google.common.util.concurrent.ListenableFuture
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import io.easyshaders.lib.processing.utils.TAG
 
-import java.io.ByteArrayOutputStream
-import java.io.IOException
-import java.util.ArrayList
-import java.util.Collections
 import java.util.LinkedHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
@@ -53,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DefaultSurfaceProcessor(
     dynamicRange: DynamicRange,
-    shaderProviderOverrides: MutableMap<InputFormat?, ShaderProvider> = Collections.emptyMap<InputFormat?, ShaderProvider>()
+    shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
 ) : SurfaceProcessorInternal, OnFrameAvailableListener {
 
     private val openGlRenderer: OpenGlRenderer
@@ -217,7 +203,7 @@ class DefaultSurfaceProcessor(
 
     private fun initGlRenderer(
         dynamicRange: DynamicRange,
-        shaderProviderOverrides: MutableMap<InputFormat?, ShaderProvider>
+        shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider>
     ) {
         val initFuture: ListenableFuture<Void> = CallbackToFutureAdapter.getFuture(
             CallbackToFutureAdapter.Resolver<Void> { completer: CallbackToFutureAdapter.Completer<Void?> ->

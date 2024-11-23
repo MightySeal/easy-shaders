@@ -16,35 +16,18 @@
 package io.easyshaders.lib.processing.util
 
 import android.opengl.EGLSurface
-// import androidx.camera.core.processing.util.AutoValue_OutputSurface
-import com.google.auto.value.AutoValue
 
 /**
  * Wrapper for output [EGLSurface] in [androidx.camera.core.processing.OpenGlRenderer].
  */
-@AutoValue
-abstract class OutputSurface {
-    /**
-     * Gets [EGLSurface].
-     */
-    abstract fun getEglSurface(): EGLSurface
-
-    /**
-     * Gets [EGLSurface] width.
-     */
-    abstract fun getWidth(): Int
-
-    /**
-     * Gets [EGLSurface] height.
-     */
-    abstract fun getHeight(): Int
-
+data class OutputSurface(
+    val eglSurface: EGLSurface,
+    val width: Int,
+    val height: Int,
+) {
     companion object {
-        /**
-         * Creates [OutputSurface].
-         */
         fun of(eglSurface: EGLSurface, width: Int, height: Int): OutputSurface {
-            return AutoValue_OutputSurface(eglSurface, width, height)
+            return OutputSurface(eglSurface, width, height)
         }
     }
 }
