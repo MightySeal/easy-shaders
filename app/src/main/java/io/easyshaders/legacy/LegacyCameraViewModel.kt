@@ -1,6 +1,7 @@
 package io.easyshaders.legacy
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -82,5 +83,9 @@ class LegacyCameraViewModel @Inject constructor(
         viewModelScope.launch {
             // uiState.emit(LegacyCameraViewState.Active)
         }
+    }
+
+    fun onTakenPhoto(bitmap: Bitmap) {
+        // TODO
     }
 }
