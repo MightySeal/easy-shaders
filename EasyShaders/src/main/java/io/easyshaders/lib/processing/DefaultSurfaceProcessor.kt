@@ -15,11 +15,10 @@ import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.impl.ImageFormatConstants
-import androidx.camera.core.impl.utils.executor.CameraXExecutors
-import androidx.camera.core.processing.SurfaceProcessorInternal
 import androidx.concurrent.futures.CallbackToFutureAdapter
 
 import com.google.common.util.concurrent.ListenableFuture
+import io.easyshaders.lib.processing.concurrent.LibExecutors
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import io.easyshaders.lib.processing.utils.TAG
@@ -40,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class DefaultSurfaceProcessor(
     dynamicRange: DynamicRange,
     shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
-) : SurfaceProcessorInternal, OnFrameAvailableListener {
+) : ReleasableSurfaceProcessor, OnFrameAvailableListener {
 
     private val openGlRenderer: OpenGlRenderer
 
@@ -75,7 +74,7 @@ class DefaultSurfaceProcessor(
     init {
         glThread.start()
         handler = Handler(glThread.looper)
-        glExecutor = CameraXExecutors.newHandlerExecutor(handler)
+        glExecutor = LibExecutors.newHandlerExecutor(handler)
         openGlRenderer = OpenGlRenderer()
         try {
             initGlRenderer(dynamicRange, shaderProviderOverrides)
@@ -115,7 +114,7 @@ class DefaultSurfaceProcessor(
                 inputSurfaceCount--
                 checkReadyToRelease()
             }
-            surfaceTexture.setOnFrameAvailableListener(this, handler)
+            surfaceTexture.setOnFrameAvailableListener(this, handler) // TODO: why handler?
         }, { surfaceRequest.willNotProvideSurface() })
     }
 
@@ -157,33 +156,19 @@ class DefaultSurfaceProcessor(
         }
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(textureMatrix)
-        // Surface, size and transform matrix for JPEG Surface if exists
-        var jpegOutput: Triple<Surface, Size, FloatArray>? = null
 
         for ((surfaceOutput, surface) in outputSurfaces) {
             surfaceOutput.updateTransformMatrix(surfaceOutputMatrix, textureMatrix)
-            if (surfaceOutput.format == ImageFormatConstants.INTERNAL_DEFINED_IMAGE_FORMAT_PRIVATE) {
-                // Render GPU output directly.
-                try {
-                    openGlRenderer.render(
-                        surfaceTexture.timestamp, surfaceOutputMatrix,
-                        surface
-                    )
-                } catch (e: RuntimeException) {
-                    // This should not happen. However, when it happens, we catch the exception
-                    // to prevent the crash.
-                    Log.e(TAG, "Failed to render with OpenGL.", e)
-                }
-            } else {
-                check(
-                    surfaceOutput.format == ImageFormat.JPEG,
-                    { "Unsupported format: " + surfaceOutput.format }
+
+            try {
+                openGlRenderer.render(
+                    surfaceTexture.timestamp, surfaceOutputMatrix,
+                    surface
                 )
-                check(jpegOutput == null, { "Only one JPEG output is supported." })
-                jpegOutput = Triple(
-                    surface, surfaceOutput.size,
-                    surfaceOutputMatrix.clone()
-                )
+            } catch (e: RuntimeException) {
+                // This should not happen. However, when it happens, we catch the exception
+                // to prevent the crash.
+                Log.e(TAG, "Failed to render with OpenGL.", e)
             }
         }
     }
