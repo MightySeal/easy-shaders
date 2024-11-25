@@ -1,6 +1,5 @@
-package io.easyshaders.data.processor
+package io.easyshaders.lib.processing
 
-import android.content.Context
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceProcessor
