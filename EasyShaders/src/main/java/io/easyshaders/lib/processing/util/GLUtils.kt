@@ -58,63 +58,70 @@ object GLUtils {
         EGL14.EGL_NONE
     )
 
-    val DEFAULT_VERTEX_SHADER: String = String.format(
-        Locale.US,
-        ("uniform mat4 uTexMatrix;\n"
-                + "uniform mat4 uTransMatrix;\n"
-                + "attribute vec4 aPosition;\n"
-                + "attribute vec4 aTextureCoord;\n"
-                + "varying vec2 %s;\n"
-                + "void main() {\n"
-                + "    gl_Position = uTransMatrix * aPosition;\n"
-                + "    %s = (uTexMatrix * aTextureCoord).xy;\n"
-                + "}\n"), VAR_TEXTURE_COORD, VAR_TEXTURE_COORD
-    )
+    val DEFAULT_VERTEX_SHADER = """
+        uniform mat4 uTexMatrix;
+        uniform mat4 uTransMatrix;
+        attribute vec4 aPosition;
+        attribute vec4 aTextureCoord;
+        varying vec2 vTextureCoord;
+        
+        void main() {
+            gl_Position = uTransMatrix * aPosition;
+            vTextureCoord = (uTexMatrix * aTextureCoord).xy;
+        }
+    """.trimIndent()
 
-    val HDR_VERTEX_SHADER: String = String.format(
-        Locale.US,
-        ("#version 300 es\n"
-                + "in vec4 aPosition;\n"
-                + "in vec4 aTextureCoord;\n"
-                + "uniform mat4 uTexMatrix;\n"
-                + "uniform mat4 uTransMatrix;\n"
-                + "out vec2 %s;\n"
-                + "void main() {\n"
-                + "  gl_Position = uTransMatrix * aPosition;\n"
-                + "  %s = (uTexMatrix * aTextureCoord).xy;\n"
-                + "}\n"), VAR_TEXTURE_COORD, VAR_TEXTURE_COORD
-    )
+    val HDR_VERTEX_SHADER = """
+        #version 300 es
+        
+        in vec4 aPosition;
+        in vec4 aTextureCoord;
+        uniform mat4 uTexMatrix;
+        uniform mat4 uTransMatrix;
+        
+        out vec2 vTextureCoord;
+        void main() {
+            gl_Position = uTransMatrix * aPosition;
+            vTextureCoord = (uTexMatrix * aTextureCoord).xy;
+        }
+    """.trimIndent()
 
-    val BLANK_VERTEX_SHADER: String = ("uniform mat4 uTransMatrix;\n"
-            + "attribute vec4 aPosition;\n"
-            + "void main() {\n"
-            + "    gl_Position = uTransMatrix * aPosition;\n"
-            + "}\n")
+    val BLANK_VERTEX_SHADER = """
+        uniform mat4 uTransMatrix;
+        attribute vec4 aPosition;
+        
+        void main() {
+            gl_Position = uTransMatrix * aPosition;
+        }
+    """.trimIndent()
 
-    val BLANK_FRAGMENT_SHADER: String = ("precision mediump float;\n"
-            + "uniform float uAlphaScale;\n"
-            + "void main() {\n"
-            + "    gl_FragColor = vec4(0.0, 0.0, 0.0, uAlphaScale);\n"
-            + "}\n")
+    val BLANK_FRAGMENT_SHADER = """
+        precision mediump float;
+        uniform float uAlphaScale;
+        
+        void main() {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, uAlphaScale);
+        }
+    """.trimIndent()
 
     val SHADER_PROVIDER_DEFAULT: ShaderProvider = object : ShaderProvider {
         override fun createFragmentShader(
             samplerVarName: String,
             fragCoordsVarName: String
         ): String {
-            return String.format(
-                Locale.US,
-                ("#extension GL_OES_EGL_image_external : require\n"
-                        + "precision mediump float;\n"
-                        + "varying vec2 %s;\n"
-                        + "uniform samplerExternalOES %s;\n"
-                        + "uniform float uAlphaScale;\n"
-                        + "void main() {\n"
-                        + "    vec4 src = texture2D(%s, %s);\n"
-                        + "    gl_FragColor = vec4(src.rgb, src.a * uAlphaScale);\n"
-                        + "}\n"),
-                fragCoordsVarName, samplerVarName, samplerVarName, fragCoordsVarName
-            )
+
+            return """
+                #extension GL_OES_EGL_image_external : require
+                precision mediump float;
+                varying vec2 $fragCoordsVarName;
+                uniform samplerExternalOES $samplerVarName;
+                uniform float uAlphaScale;
+                              
+                void main() {
+                    vec4 src = texture2D($samplerVarName, $fragCoordsVarName);
+                    gl_FragColor = vec4(src.rgb, src.a * uAlphaScale);
+                }
+            """.trimIndent()
         }
     }
 
@@ -123,22 +130,22 @@ object GLUtils {
             samplerVarName: String,
             fragCoordsVarName: String
         ): String {
-            return String.format(
-                Locale.US,
-                ("#version 300 es\n"
-                        + "#extension GL_OES_EGL_image_external_essl3 : require\n"
-                        + "precision mediump float;\n"
-                        + "uniform samplerExternalOES %s;\n"
-                        + "uniform float uAlphaScale;\n"
-                        + "in vec2 %s;\n"
-                        + "out vec4 outColor;\n"
-                        + "\n"
-                        + "void main() {\n"
-                        + "  vec4 src = texture(%s, %s);\n"
-                        + "  outColor = vec4(src.rgb, src.a * uAlphaScale);\n"
-                        + "}"),
-                samplerVarName, fragCoordsVarName, samplerVarName, fragCoordsVarName
-            )
+
+            return """
+                #version 300 es
+                #extension GL_OES_EGL_image_external_essl3 : require
+                
+                precision mediump float;
+                uniform samplerExternalOES $samplerVarName;
+                uniform float uAlphaScale;
+                in vec2 $fragCoordsVarName;
+                out vec4 outColor;
+                
+                void main() {
+                    vec4 src = texture($samplerVarName, $fragCoordsVarName);
+                    outColor = vec4(src.rgb, src.a * uAlphaScale);
+                }
+            """.trimIndent()
         }
     }
 
@@ -147,33 +154,36 @@ object GLUtils {
             samplerVarName: String,
             fragCoordsVarName: String
         ): String {
-            return String.format(
-                Locale.US,
-                ("#version 300 es\n"
-                        + "#extension GL_EXT_YUV_target : require\n"
-                        + "precision mediump float;\n"
-                        + "uniform __samplerExternal2DY2YEXT %s;\n"
-                        + "uniform float uAlphaScale;\n"
-                        + "in vec2 %s;\n"
-                        + "out vec4 outColor;\n"
-                        + "\n"
-                        + "vec3 yuvToRgb(vec3 yuv) {\n"
-                        + "  const vec3 yuvOffset = vec3(0.0625, 0.5, 0.5);\n"
-                        + "  const mat3 yuvToRgbColorMat = mat3(\n"
-                        + "    1.1689f, 1.1689f, 1.1689f,\n"
-                        + "    0.0000f, -0.1881f, 2.1502f,\n"
-                        + "    1.6853f, -0.6530f, 0.0000f\n"
-                        + "  );\n"
-                        + "  return clamp(yuvToRgbColorMat * (yuv - yuvOffset), 0.0, 1.0);\n"
-                        + "}\n"
-                        + "\n"
-                        + "void main() {\n"
-                        + "  vec3 srcYuv = texture(%s, %s).xyz;\n"
-                        + "  vec3 srcRgb = yuvToRgb(srcYuv);\n"
-                        + "  outColor = vec4(srcRgb, uAlphaScale);\n"
-                        + "}"),
-                samplerVarName, fragCoordsVarName, samplerVarName, fragCoordsVarName
-            )
+
+            return """
+                #version 300 es
+                #extension GL_EXT_YUV_target : require
+                
+                precision mediump float;
+                uniform __samplerExternal2DY2YEXT %s;
+                uniform float uAlphaScale;
+                in vec2 %s;
+                out vec4 outColor;
+                
+                vec3 yuvToRgb(vec3 yuv) {
+                  const vec3 yuvOffset = vec3(0.0625, 0.5, 0.5);\n"
+                  const mat3 yuvToRgbColorMat = mat3(
+                        1.1689f, 1.1689f, 1.1689f,
+                        0.0000f, -0.1881f, 2.1502f,
+                        1.6853f, -0.6530f, 0.0000f
+                  );
+
+                  return clamp(yuvToRgbColorMat * (yuv - yuvOffset), 0.0, 1.0);
+                }
+                  
+                  void main() {
+                    vec3 srcYuv = texture(%s, %s).xyz;
+                    vec3 srcRgb = yuvToRgb(srcYuv);
+                    outColor = vec4(srcRgb, uAlphaScale);
+                  }
+                }
+                
+            """.trimIndent()
         }
     }
 
@@ -303,47 +313,20 @@ object GLUtils {
      */
     fun createPrograms(
         dynamicRange: DynamicRange,
-        shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider>
+        shaderProviderOverrides: Map<InputFormat, ShaderProvider>
     ): MutableMap<InputFormat, Program2D> {
         val programs = HashMap<InputFormat, Program2D>()
         for (inputFormat in InputFormat.entries) {
-            val shaderProviderOverride = shaderProviderOverrides.get(inputFormat)
-            var program: Program2D?
-            if (shaderProviderOverride != null) {
-                // Always use the overridden shader provider if present
-                program = SamplerShaderProgram(dynamicRange, shaderProviderOverride)
-            } else if (inputFormat == InputFormat.YUV || inputFormat == InputFormat.DEFAULT) {
-                // Use a default sampler shader for DEFAULT or YUV
-                program = SamplerShaderProgram(dynamicRange, inputFormat)
-            } else {
-                check(
-                    inputFormat == InputFormat.UNKNOWN,
-                    { "Unhandled input format: $inputFormat" }
-                )
-                if (dynamicRange.is10BitHdrBackport) {
-                    // InputFormat is UNKNOWN and we don't know if we need to use a
-                    // YUV-specific sampler for HDR. Use a blank shader program.
-                    program = BlankShaderProgram()
-                } else {
-                    // If we're not rendering HDR content, we can use the default sampler shader
-                    // program since it can handle both YUV and DEFAULT inputs when the format
-                    // is UNKNOWN.
-                    val defaultShaderProviderOverride =
-                        shaderProviderOverrides.get(InputFormat.DEFAULT)
-                    if (defaultShaderProviderOverride != null) {
-                        program = SamplerShaderProgram(
-                            dynamicRange,
-                            defaultShaderProviderOverride
-                        )
-                    } else {
-                        program = SamplerShaderProgram(dynamicRange, InputFormat.DEFAULT)
-                    }
-                }
+            val shaderProviderOverride = shaderProviderOverrides[inputFormat]
+
+            val program = when {
+                shaderProviderOverride != null -> SamplerShaderProgram(dynamicRange, shaderProviderOverride)
+                inputFormat == InputFormat.YUV || inputFormat == InputFormat.DEFAULT -> SamplerShaderProgram(dynamicRange, inputFormat)
+                dynamicRange.is10BitHdrBackport -> BlankShaderProgram()
+                else -> shaderProviderOverrides[InputFormat.DEFAULT]?.let { SamplerShaderProgram(dynamicRange, it) } ?: SamplerShaderProgram(dynamicRange, InputFormat.DEFAULT)
             }
-            Log.d(
-                TAG, ("Shader program for input format " + inputFormat + " created: "
-                        + program)
-            )
+
+            Log.d(TAG, "Shader program for input format $inputFormat created: $program")
             programs.put(inputFormat, program)
         }
         return programs
@@ -359,7 +342,7 @@ object GLUtils {
 
         val texId = textures[0]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId)
-        checkGlErrorOrThrow("glBindTexture " + texId)
+        checkGlErrorOrThrow("glBindTexture $texId")
 
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
@@ -394,7 +377,7 @@ object GLUtils {
      * Checks the location error.
      */
     fun checkLocationOrThrow(location: Int, label: String) {
-        check(location >= 0) { "Unable to locate '" + label + "' in program" }
+        check(location >= 0) { "Unable to locate '$label' in program" }
     }
 
     /**
@@ -402,7 +385,7 @@ object GLUtils {
      */
     fun checkEglErrorOrThrow(op: String) {
         val error = EGL14.eglGetError()
-        check(error == EGL14.EGL_SUCCESS) { op + ": EGL error: 0x" + Integer.toHexString(error) }
+        check(error == EGL14.EGL_SUCCESS) {  "$op: EGL error: 0x ${Integer.toHexString(error)}" }
     }
 
     /**
@@ -410,7 +393,7 @@ object GLUtils {
      */
     fun checkGlErrorOrThrow(op: String) {
         val error = GLES20.glGetError()
-        check(error == GLES20.GL_NO_ERROR) { op + ": GL error 0x" + Integer.toHexString(error) }
+        check(error == GLES20.GL_NO_ERROR) { "$op: GL error 0x + ${Integer.toHexString(error)}" }
     }
 
     /**
@@ -477,11 +460,7 @@ object GLUtils {
             if (eglExtensions.contains("EGL_EXT_gl_colorspace_bt2020_hlg")) {
                 attribs = HLG_SURFACE_ATTRIBS
             } else {
-                Log.w(
-                    TAG, ("Dynamic range uses HLG encoding, but "
-                            + "device does not support EGL_EXT_gl_colorspace_bt2020_hlg."
-                            + "Fallback to default colorspace.")
-                )
+                Log.w(TAG, "Dynamic range uses HLG encoding, but device does not support EGL_EXT_gl_colorspace_bt2020_hlg. Fallback to default colorspace.")
             }
         }
         // TODO(b/303675500): Add path for PQ (EGL_EXT_gl_colorspace_bt2020_pq) output for
@@ -534,9 +513,9 @@ object GLUtils {
             val source = shaderProvider.createFragmentShader(VAR_TEXTURE, VAR_TEXTURE_COORD)
             // A simple check to workaround custom shader doesn't contain required variable.
             // See b/241193761.
-            require(
-                !(source == null || !source.contains(VAR_TEXTURE_COORD) || !source.contains(VAR_TEXTURE))
-            ) { "Invalid fragment shader" }
+            require(!(source == null || !source.contains(VAR_TEXTURE_COORD) || !source.contains(VAR_TEXTURE))) {
+                "Invalid fragment shader"
+            }
             return source
         } catch (t: Throwable) {
             if (t is IllegalArgumentException) {

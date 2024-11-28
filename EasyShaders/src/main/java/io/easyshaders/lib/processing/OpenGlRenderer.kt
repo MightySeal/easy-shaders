@@ -67,6 +67,8 @@ class OpenGlRenderer {
 
     private var externalTextureId = -1
 
+
+    private lateinit var initDynamicRange: DynamicRange
     /**
      * Initializes the OpenGLRenderer
      *
@@ -97,6 +99,7 @@ class OpenGlRenderer {
         dynamicRange: DynamicRange,
         shaderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
     ): GraphicDeviceInfo {
+        this.initDynamicRange = dynamicRange
         var dynamicRange = dynamicRange
         GLUtils.checkInitializedOrThrow(isInitialized, false)
         val infoBuilder = GraphicDeviceInfo.Builder()
@@ -130,6 +133,52 @@ class OpenGlRenderer {
         glThread = Thread.currentThread()
         isInitialized.set(true)
         return infoBuilder.build()
+    }
+
+    fun setFragmentShader(dynamicRange: DynamicRange) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        val currentPrograms = HashMap(programHandles)
+        // TODO: dispose old programs?
+
+        val provider =  object : ShaderProvider {
+            override fun createFragmentShader(
+                samplerVarName: String,
+                fragCoordsVarName: String
+            ): String = """
+                #extension GL_OES_EGL_image_external : require
+                precision mediump float;
+                varying vec2 $fragCoordsVarName;
+                uniform samplerExternalOES $samplerVarName;
+                uniform float uAlphaScale;
+                
+                vec3 grayscale(vec3 color) {
+                    return vec3(color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722);
+                }
+                
+                void main() {
+                    vec4 src = texture2D($samplerVarName, $fragCoordsVarName);
+                    vec3 grayscale = grayscale(src.rgb);
+                    
+                    gl_FragColor = vec4(grayscale, src.a * uAlphaScale);
+                }
+            """.trimIndent().also {
+                println("========== Create override program!")
+            }
+        }
+
+        val newPrograms = GLUtils.createPrograms(
+            dynamicRange,
+            mapOf(InputFormat.DEFAULT to provider)
+        )
+
+        programHandles = newPrograms
+        useAndConfigureProgramWithTexture(textureId = externalTextureId)
+
+        // TODO: dispose old ones
+
+
     }
 
     /**
@@ -388,14 +437,13 @@ class OpenGlRenderer {
     }
 
     protected fun useAndConfigureProgramWithTexture(textureId: Int) {
-        val program = programHandles.get(currentInputformat)
-        checkNotNull(program) { "Unable to configure program for input format: " + currentInputformat }
+        val program = programHandles[currentInputformat]
+        checkNotNull(program) { "Unable to configure program for input format: $currentInputformat" }
         if (currentProgram !== program) {
             currentProgram = program
             currentProgram!!.use()
             Log.d(
-                TAG, ("Using program for input format " + currentInputformat + ": "
-                        + currentProgram)
+                TAG, ("Using program for input format $currentInputformat: $currentProgram")
             )
         }
 
@@ -453,9 +501,8 @@ class OpenGlRenderer {
 
     protected fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
         check(
-            outputSurfaceMap.containsKey(surface),
-            { "The surface is not registered." }
-        )
+            outputSurfaceMap.containsKey(surface)
+        ) { "The surface is not registered." }
 
         return outputSurfaceMap.getValue(surface)
     }
@@ -468,10 +515,10 @@ class OpenGlRenderer {
                 surfaceAttrib
             )
         } catch (e: IllegalStateException) {
-            Log.w(TAG, "Failed to create EGL surface: " + e.message, e)
+            Log.w(TAG, "Failed to create EGL surface: ${e.message}", e)
             return null
         } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Failed to create EGL surface: " + e.message, e)
+            Log.w(TAG, "Failed to create EGL surface: ${e.message}", e)
             return null
         }
 
@@ -499,7 +546,7 @@ class OpenGlRenderer {
             try {
                 EGL14.eglDestroySurface(eglDisplay, removedOutputSurface.eglSurface)
             } catch (e: RuntimeException) {
-                Log.w(TAG, "Failed to destroy EGL surface: " + e.message, e)
+                Log.w(TAG, "Failed to destroy EGL surface: ${e.message}", e)
             }
         }
     }
