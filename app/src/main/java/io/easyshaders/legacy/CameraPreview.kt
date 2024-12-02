@@ -17,6 +17,7 @@ fun CameraPreview(
         factory = {
             PreviewView(it).apply {
                 this.controller = controller
+                // this.surfaceProvider =
                 controller.bindToLifecycle(lifecycleOwner)
             }
         },

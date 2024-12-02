@@ -2,6 +2,7 @@ package io.easyshaders.legacy
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -21,7 +22,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.DefaultCameraEffect
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -51,6 +57,9 @@ class LegacyCameraViewModel @Inject constructor(
 
     val uiState: Flow<LegacyCameraViewState>
         field = MutableStateFlow<LegacyCameraViewState>(LegacyCameraViewState.Loading)
+
+    private val _bitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
+    val bitmaps = _bitmaps.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -85,7 +94,11 @@ class LegacyCameraViewModel @Inject constructor(
         }
     }
 
-    fun onTakenPhoto(bitmap: Bitmap) {
-        // TODO
+    fun onTakePhoto(bitmap: Bitmap) {
+        _bitmaps.value += bitmap
+    }
+
+    fun uploadImage(bitmap: Bitmap) {
+
     }
 }

@@ -5,8 +5,8 @@ package io.easyshaders.legacy
 import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.net.Uri
-import android.nfc.Tag
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -41,10 +41,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,23 +56,37 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import io.easyshaders.data.processor.utils.TAG
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 @Composable
 fun LegacyCameraScreen(
+    outputDirectory: File,
+    executor: Executor,
+    onImageCaptured: (Uri) -> Unit,
     viewModel: LegacyCameraViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier,
-    controller: LifecycleCameraController,
+    modifier: Modifier = Modifier
 ) {
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+    val context = LocalContext.current
+    val controller = remember {
+        LifecycleCameraController(context).apply {
+            CameraController.IMAGE_CAPTURE
+        }
+    }
+
+    val imageCapture: ImageCapture = remember { ImageCapture.Builder().build() }
+    val cameraSelector = CameraSelector.Builder()
+        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+        .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+        .build()
+
+    val preview = Preview.Builder().build()
+    val previewView = remember { PreviewView(context) }
 
     if (cameraPermissionState.status.isGranted) {
         val state by viewModel.uiState.collectAsState(LegacyCameraViewState.Loading)
@@ -86,22 +98,38 @@ fun LegacyCameraScreen(
 
             LegacyCameraViewState.Ready -> {
                 val lifecycleOwner = LocalLifecycleOwner.current
-                val context = LocalContext.current
-                val previewView = remember { PreviewView(context) }
+//                val previewView = remember { PreviewView(context) }
 
                 LegacyCameraView(
+                    imageCapture = imageCapture,
+                    outputDirectory = outputDirectory,
+                    executor = executor,
+                    onImageCaptured = onImageCaptured,
+                    previewView = previewView,
                     controller = controller,
                     context = context,
                     aspect = 0.75f,
-                    modifier = modifier,
-                    onPhotoTaken = viewModel::onTakenPhoto
+                    viewModel = viewModel,
+                    modifier = modifier
                 )
 
-                LaunchedEffect(previewView) {
-                    viewModel.startPreview(
-                        lifecycleOwner = lifecycleOwner,
-                        surfaceProvider = previewView.surfaceProvider
+//                LaunchedEffect(previewView) {
+//                    viewModel.startPreview(
+//                        lifecycleOwner = lifecycleOwner,
+//                        surfaceProvider = previewView.surfaceProvider
+//                    )
+//                }
+                LaunchedEffect(cameraSelector) {
+                    val cameraProvider = context.getCameraProvider()
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageCapture
                     )
+
+                    preview.surfaceProvider = previewView.surfaceProvider
                 }
             }
         }
@@ -113,13 +141,17 @@ fun LegacyCameraScreen(
 
 @Composable
 private fun LegacyCameraView(
+    imageCapture: ImageCapture,
+    outputDirectory: File,
+    executor: Executor,
+    onImageCaptured: (Uri) -> Unit,
+    previewView: PreviewView,
     controller: LifecycleCameraController,
     context: Context,
     aspect: Float,
-    modifier: Modifier = Modifier,
-    onPhotoTaken: (Bitmap) -> Unit,
+    viewModel: LegacyCameraViewModel,
+    modifier: Modifier = Modifier
 ) {
-
     Box(
         modifier = modifier
             .background(color = Color.Black),
@@ -132,13 +164,13 @@ private fun LegacyCameraView(
                 .height(10.dp)
                 .background(Color.Blue)
             )
-            CameraPreview(
-                controller = controller,
-                modifier = Modifier
-                    .aspectRatio(aspect)
-                    .fillMaxSize()
-            )
-
+            AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
+//            CameraPreview(
+//                controller = controller,
+//                modifier = Modifier
+//                    .aspectRatio(aspect)
+//                    .fillMaxSize()
+//            )
             Spacer(modifier = Modifier
                 .background(Color.Red)
                 .height(10.dp)
@@ -172,11 +204,13 @@ private fun LegacyCameraView(
             IconButton(
                 onClick = {
                     takePhoto(
-                        context = context,
+                        imageCapture = imageCapture,
+                        outputDirectory = outputDirectory,
+                        executor = executor,
+                        onImageCaptured = onImageCaptured,
                         controller = controller,
-                        onPhotoTaken = {
-                            onPhotoTaken(it)
-                        }
+                        onPhotoTaken = viewModel::onTakePhoto,
+                        context = context
                     )
                 },
                 modifier = Modifier
@@ -193,7 +227,6 @@ private fun LegacyCameraView(
 //                    .align(Alignment.BottomCenter)
 //                    .padding(bottom = 16.dp),
 //            ) {
-//
 //            }
         }
     }
@@ -217,25 +250,57 @@ private fun CaptureButton(
 }
 
 private fun takePhoto(
-    context: Context,
+    imageCapture: ImageCapture,
+    outputDirectory: File,
+    executor: Executor,
+    onImageCaptured: (Uri) -> Unit,
     controller: LifecycleCameraController,
-    onPhotoTaken: (Bitmap) -> Unit
+    onPhotoTaken: (Bitmap) -> Unit,
+    context: Context
 ) {
+//    val photoFile = File(
+//        outputDirectory,
+//        SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US).format(System.currentTimeMillis()) + ".jpg"
+//    )
+//
+//    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+//
+//    imageCapture.takePicture(outputOptions, executor, object: ImageCapture.OnImageSavedCallback {
+//        override fun onError(exception: ImageCaptureException) {
+//            Log.e("kilo", "Take photo error:", exception)
+//            onError(exception)
+//        }
+//
+//        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+//            val savedUri = Uri.fromFile(photoFile)
+//            onImageCaptured(savedUri)
+//        }
+//    })
     controller.takePicture(
         ContextCompat.getMainExecutor(context),
         object : OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
                 super.onCaptureSuccess(image)
-
-                onPhotoTaken(image.toBitmap())
+                val matrix = Matrix().apply {
+                    postRotate(image.imageInfo.rotationDegrees.toFloat())
+                    // postScale(-1f, 1f) handle for front camera mirror issue
+                }
+                val rotatedBitmap = Bitmap.createBitmap(
+                    image.toBitmap(),
+                    0,
+                    0,
+                    image.width,
+                    image.height,
+                    matrix,
+                    true
+                )
+                onPhotoTaken(rotatedBitmap)
             }
 
             override fun onError(exception: ImageCaptureException) {
                 super.onError(exception)
-
-                Log.e(TAG, "exception: $exception")
+                Log.e("Camera","Couldn't take photo: ", exception)
             }
-
         }
     )
 }
