@@ -105,7 +105,6 @@ fun LegacyCameraScreen(
                     outputDirectory = outputDirectory,
                     executor = executor,
                     onImageCaptured = onImageCaptured,
-                    previewView = previewView,
                     controller = controller,
                     context = context,
                     aspect = 0.75f,
@@ -113,12 +112,6 @@ fun LegacyCameraScreen(
                     modifier = modifier
                 )
 
-//                LaunchedEffect(previewView) {
-//                    viewModel.startPreview(
-//                        lifecycleOwner = lifecycleOwner,
-//                        surfaceProvider = previewView.surfaceProvider
-//                    )
-//                }
                 LaunchedEffect(cameraSelector) {
                     val cameraProvider = context.getCameraProvider()
                     cameraProvider.unbindAll()
@@ -145,7 +138,6 @@ private fun LegacyCameraView(
     outputDirectory: File,
     executor: Executor,
     onImageCaptured: (Uri) -> Unit,
-    previewView: PreviewView,
     controller: LifecycleCameraController,
     context: Context,
     aspect: Float,
@@ -164,13 +156,13 @@ private fun LegacyCameraView(
                 .height(10.dp)
                 .background(Color.Blue)
             )
-            AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
-//            CameraPreview(
-//                controller = controller,
-//                modifier = Modifier
-//                    .aspectRatio(aspect)
-//                    .fillMaxSize()
-//            )
+            //AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
+            CameraPreview(
+                controller = controller,
+                modifier = Modifier
+                    .aspectRatio(aspect)
+                    .fillMaxSize()
+            )
             Spacer(modifier = Modifier
                 .background(Color.Red)
                 .height(10.dp)
