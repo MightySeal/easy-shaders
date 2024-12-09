@@ -20,20 +20,17 @@ import android.opengl.EGLConfig
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
-import android.opengl.GLES20
+import android.opengl.GLES32
 import android.opengl.Matrix
 import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.ShaderProvider
-import java.lang.IllegalArgumentException
+import io.easyshaders.lib.processing.program.ShaderProgram
 import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import java.util.HashMap
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.regex.Pattern
 
@@ -57,135 +54,6 @@ object GLUtils {
         EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_BT2020_HLG_EXT,
         EGL14.EGL_NONE
     )
-
-    val DEFAULT_VERTEX_SHADER = """
-        uniform mat4 uTexMatrix;
-        uniform mat4 uTransMatrix;
-        attribute vec4 aPosition;
-        attribute vec4 aTextureCoord;
-        varying vec2 vTextureCoord;
-        
-        void main() {
-            gl_Position = uTransMatrix * aPosition;
-            vTextureCoord = (uTexMatrix * aTextureCoord).xy;
-        }
-    """.trimIndent()
-
-    val HDR_VERTEX_SHADER = """
-        #version 300 es
-        
-        in vec4 aPosition;
-        in vec4 aTextureCoord;
-        uniform mat4 uTexMatrix;
-        uniform mat4 uTransMatrix;
-        
-        out vec2 vTextureCoord;
-        void main() {
-            gl_Position = uTransMatrix * aPosition;
-            vTextureCoord = (uTexMatrix * aTextureCoord).xy;
-        }
-    """.trimIndent()
-
-    val BLANK_VERTEX_SHADER = """
-        uniform mat4 uTransMatrix;
-        attribute vec4 aPosition;
-        
-        void main() {
-            gl_Position = uTransMatrix * aPosition;
-        }
-    """.trimIndent()
-
-    val BLANK_FRAGMENT_SHADER = """
-        precision mediump float;
-        uniform float uAlphaScale;
-        
-        void main() {
-            gl_FragColor = vec4(0.0, 0.0, 0.0, uAlphaScale);
-        }
-    """.trimIndent()
-
-    val SHADER_PROVIDER_DEFAULT: ShaderProvider = object : ShaderProvider {
-        override fun createFragmentShader(
-            samplerVarName: String,
-            fragCoordsVarName: String
-        ): String {
-
-            return """
-                #extension GL_OES_EGL_image_external : require
-                precision mediump float;
-                varying vec2 $fragCoordsVarName;
-                uniform samplerExternalOES $samplerVarName;
-                uniform float uAlphaScale;
-                              
-                void main() {
-                    vec4 src = texture2D($samplerVarName, $fragCoordsVarName);
-                    gl_FragColor = vec4(src.rgb, src.a * uAlphaScale);
-                }
-            """.trimIndent()
-        }
-    }
-
-    val SHADER_PROVIDER_HDR_DEFAULT: ShaderProvider = object : ShaderProvider {
-        override fun createFragmentShader(
-            samplerVarName: String,
-            fragCoordsVarName: String
-        ): String {
-
-            return """
-                #version 300 es
-                #extension GL_OES_EGL_image_external_essl3 : require
-                
-                precision mediump float;
-                uniform samplerExternalOES $samplerVarName;
-                uniform float uAlphaScale;
-                in vec2 $fragCoordsVarName;
-                out vec4 outColor;
-                
-                void main() {
-                    vec4 src = texture($samplerVarName, $fragCoordsVarName);
-                    outColor = vec4(src.rgb, src.a * uAlphaScale);
-                }
-            """.trimIndent()
-        }
-    }
-
-    val SHADER_PROVIDER_HDR_YUV: ShaderProvider = object : ShaderProvider {
-        override fun createFragmentShader(
-            samplerVarName: String,
-            fragCoordsVarName: String
-        ): String {
-
-            return """
-                #version 300 es
-                #extension GL_EXT_YUV_target : require
-                
-                precision mediump float;
-                uniform __samplerExternal2DY2YEXT %s;
-                uniform float uAlphaScale;
-                in vec2 %s;
-                out vec4 outColor;
-                
-                vec3 yuvToRgb(vec3 yuv) {
-                  const vec3 yuvOffset = vec3(0.0625, 0.5, 0.5);\n"
-                  const mat3 yuvToRgbColorMat = mat3(
-                        1.1689f, 1.1689f, 1.1689f,
-                        0.0000f, -0.1881f, 2.1502f,
-                        1.6853f, -0.6530f, 0.0000f
-                  );
-
-                  return clamp(yuvToRgbColorMat * (yuv - yuvOffset), 0.0, 1.0);
-                }
-                  
-                  void main() {
-                    vec3 srcYuv = texture(%s, %s).xyz;
-                    vec3 srcRgb = yuvToRgb(srcYuv);
-                    outColor = vec4(srcRgb, uAlphaScale);
-                  }
-                }
-                
-            """.trimIndent()
-        }
-    }
 
     val VERTEX_COORDS: FloatArray = floatArrayOf(
         -1.0f, -1.0f,  // 0 bottom left
@@ -222,27 +90,6 @@ object GLUtils {
         checkEglErrorOrThrow("eglCreateWindowSurface")
         checkNotNull(eglSurface) { "surface was null" }
         return eglSurface
-    }
-
-    /**
-     * Creates the vertex or fragment shader.
-     */
-    fun loadShader(shaderType: Int, source: String): Int {
-        val shader = GLES20.glCreateShader(shaderType)
-        checkGlErrorOrThrow("glCreateShader type=$shaderType")
-        GLES20.glShaderSource(shader, source)
-        GLES20.glCompileShader(shader)
-        val compiled = IntArray(1)
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled,  /*offset=*/0)
-        if (compiled[0] == 0) {
-            Log.w(TAG, "Could not compile shader: $source")
-            val shaderLog = GLES20.glGetShaderInfoLog(shader)
-            GLES20.glDeleteShader(shader)
-            throw IllegalStateException(
-                "Could not compile shader type $shaderType:$shaderLog"
-            )
-        }
-        return shader
     }
 
     /**
@@ -302,34 +149,21 @@ object GLUtils {
         return eglSurface
     }
 
-    /**
-     * Creates program objects based on shaders which are appropriate for each input format.
-     *
-     *
-     * Each [InputFormat] may have different sampler requirements based on the dynamic
-     * range. For that reason, we create a separate program for each input format, and will switch
-     * to the program when the input format changes so we correctly sample the input texture
-     * (or no-op, in some cases).
-     */
-    fun createPrograms(
+    fun createPipelines(
         dynamicRange: DynamicRange,
-        shaderProviderOverrides: Map<InputFormat, ShaderProvider>
-    ): MutableMap<InputFormat, Program2D> {
-        val programs = HashMap<InputFormat, Program2D>()
-        for (inputFormat in InputFormat.entries) {
-            val shaderProviderOverride = shaderProviderOverrides[inputFormat]
-
-            val program = when {
-                shaderProviderOverride != null -> SamplerShaderProgram(dynamicRange, shaderProviderOverride)
-                inputFormat == InputFormat.YUV || inputFormat == InputFormat.DEFAULT -> SamplerShaderProgram(dynamicRange, inputFormat)
-                dynamicRange.is10BitHdrBackport -> BlankShaderProgram()
-                else -> shaderProviderOverrides[InputFormat.DEFAULT]?.let { SamplerShaderProgram(dynamicRange, it) } ?: SamplerShaderProgram(dynamicRange, InputFormat.DEFAULT)
+    ): Map<InputFormat, ShaderProgram> {
+        return InputFormat.entries
+            .associate { inputFormat ->
+                // TODO: implement out input formats
+                val pipeline = when {
+                    inputFormat == InputFormat.DEFAULT -> ShaderProgram()
+                    inputFormat == InputFormat.YUV -> ShaderProgram()
+                    inputFormat == InputFormat.UNKNOWN -> ShaderProgram()
+                    dynamicRange.is10BitHdrBackport -> ShaderProgram()
+                    else -> ShaderProgram()
+                }
+                inputFormat to pipeline
             }
-
-            Log.d(TAG, "Shader program for input format $inputFormat created: $program")
-            programs.put(inputFormat, program)
-        }
-        return programs
     }
 
     /**
@@ -337,29 +171,17 @@ object GLUtils {
      */
     fun createTexture(): Int {
         val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
+        GLES32.glGenTextures(1, textures, 0)
         checkGlErrorOrThrow("glGenTextures")
 
         val texId = textures[0]
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId)
+        GLES32.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId)
         checkGlErrorOrThrow("glBindTexture $texId")
 
-        GLES20.glTexParameteri(
-            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
-            GLES20.GL_NEAREST
-        )
-        GLES20.glTexParameteri(
-            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER,
-            GLES20.GL_LINEAR
-        )
-        GLES20.glTexParameteri(
-            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S,
-            GLES20.GL_CLAMP_TO_EDGE
-        )
-        GLES20.glTexParameteri(
-            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T,
-            GLES20.GL_CLAMP_TO_EDGE
-        )
+        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_MIN_FILTER, GLES32.GL_NEAREST)
+        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_MAG_FILTER, GLES32.GL_LINEAR)
+        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_WRAP_S, GLES32.GL_CLAMP_TO_EDGE)
+        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_WRAP_T, GLES32.GL_CLAMP_TO_EDGE)
         checkGlErrorOrThrow("glTexParameter")
         return texId
     }
@@ -385,15 +207,15 @@ object GLUtils {
      */
     fun checkEglErrorOrThrow(op: String) {
         val error = EGL14.eglGetError()
-        check(error == EGL14.EGL_SUCCESS) {  "$op: EGL error: 0x ${Integer.toHexString(error)}" }
+        check(error == EGL14.EGL_SUCCESS) { "$op: EGL error: 0x${Integer.toHexString(error)}" }
     }
 
     /**
      * Checks the gl error and throw.
      */
     fun checkGlErrorOrThrow(op: String) {
-        val error = GLES20.glGetError()
-        check(error == GLES20.GL_NO_ERROR) { "$op: GL error 0x + ${Integer.toHexString(error)}" }
+        val error = GLES32.glGetError()
+        check(error == GLES32.GL_NO_ERROR) { "$op: GL error 0x${Integer.toHexString(error)}" }
     }
 
     /**
@@ -437,7 +259,7 @@ object GLUtils {
     fun getGlVersionNumber(): String {
         // Logic adapted from CTS Egl14Utils:
         // https://cs.android.com/android/platform/superproject/+/master:cts/tests/tests/opengl/src/android/opengl/cts/Egl14Utils.java;l=46;drc=1c705168ab5118c42e5831cd84871d51ff5176d1
-        val glVersion = GLES20.glGetString(GLES20.GL_VERSION)
+        val glVersion = GLES32.glGetString(GLES32.GL_VERSION)
         val pattern = Pattern.compile("OpenGL ES ([0-9]+)\\.([0-9]+).*")
         val matcher = pattern.matcher(glVersion)
         if (matcher.find()) {
@@ -460,7 +282,10 @@ object GLUtils {
             if (eglExtensions.contains("EGL_EXT_gl_colorspace_bt2020_hlg")) {
                 attribs = HLG_SURFACE_ATTRIBS
             } else {
-                Log.w(TAG, "Dynamic range uses HLG encoding, but device does not support EGL_EXT_gl_colorspace_bt2020_hlg. Fallback to default colorspace.")
+                Log.w(
+                    TAG,
+                    "Dynamic range uses HLG encoding, but device does not support EGL_EXT_gl_colorspace_bt2020_hlg. Fallback to default colorspace."
+                )
             }
         }
         // TODO(b/303675500): Add path for PQ (EGL_EXT_gl_colorspace_bt2020_pq) output for
@@ -473,7 +298,7 @@ object GLUtils {
      */
     fun generateFbo(): Int {
         val fbos = IntArray(1)
-        GLES20.glGenFramebuffers(1, fbos, 0)
+        GLES32.glGenFramebuffers(1, fbos, 0)
         checkGlErrorOrThrow("glGenFramebuffers")
         return fbos[0]
     }
@@ -483,7 +308,7 @@ object GLUtils {
      */
     fun generateTexture(): Int {
         val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
+        GLES32.glGenTextures(1, textures, 0)
         checkGlErrorOrThrow("glGenTextures")
         return textures[0]
     }
@@ -493,7 +318,7 @@ object GLUtils {
      */
     fun deleteTexture(texture: Int) {
         val textures = intArrayOf(texture)
-        GLES20.glDeleteTextures(1, textures, 0)
+        GLES32.glDeleteTextures(1, textures, 0)
         checkGlErrorOrThrow("glDeleteTextures")
     }
 
@@ -502,26 +327,7 @@ object GLUtils {
      */
     fun deleteFbo(fbo: Int) {
         val fbos = intArrayOf(fbo)
-        GLES20.glDeleteFramebuffers(1, fbos, 0)
+        GLES32.glDeleteFramebuffers(1, fbos, 0)
         checkGlErrorOrThrow("glDeleteFramebuffers")
-    }
-
-    fun getFragmentShaderSource(shaderProvider: ShaderProvider): String {
-        // Throw IllegalArgumentException if the shader provider can not provide a valid
-        // fragment shader.
-        try {
-            val source = shaderProvider.createFragmentShader(VAR_TEXTURE, VAR_TEXTURE_COORD)
-            // A simple check to workaround custom shader doesn't contain required variable.
-            // See b/241193761.
-            require(!(source == null || !source.contains(VAR_TEXTURE_COORD) || !source.contains(VAR_TEXTURE))) {
-                "Invalid fragment shader"
-            }
-            return source
-        } catch (t: Throwable) {
-            if (t is IllegalArgumentException) {
-                throw t
-            }
-            throw IllegalArgumentException("Unable retrieve fragment shader source", t)
-        }
     }
 }

@@ -1,12 +1,10 @@
 package io.easyshaders.lib.processing
 
-import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.graphics.SurfaceTexture.OnFrameAvailableListener
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import android.util.Size
 import android.view.Surface
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
@@ -14,7 +12,6 @@ import androidx.arch.core.util.Function
 import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceRequest
-import androidx.camera.core.impl.ImageFormatConstants
 import androidx.concurrent.futures.CallbackToFutureAdapter
 
 import com.google.common.util.concurrent.ListenableFuture
@@ -38,9 +35,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DefaultSurfaceProcessor(
     dynamicRange: DynamicRange,
-    shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
 ) : ReleasableSurfaceProcessor, OnFrameAvailableListener {
 
+    // private val openGlRenderer: OpenGlRendererLegacy
     private val openGlRenderer: OpenGlRenderer
 
     @VisibleForTesting
@@ -76,8 +73,9 @@ class DefaultSurfaceProcessor(
         handler = Handler(glThread.looper)
         glExecutor = LibExecutors.newHandlerExecutor(handler)
         openGlRenderer = OpenGlRenderer()
+        // openGlRenderer = OpenGlRendererLegacy()
         try {
-            initGlRenderer(dynamicRange, shaderProviderOverrides)
+            initGlRenderer(dynamicRange)
         } catch (e: RuntimeException) {
             release()
             throw e
@@ -89,6 +87,7 @@ class DefaultSurfaceProcessor(
             surfaceRequest.willNotProvideSurface()
             return
         }
+
         executeSafely({
             inputSurfaceCount++
             val surfaceTexture = SurfaceTexture(openGlRenderer.getTextureName())
@@ -99,14 +98,13 @@ class DefaultSurfaceProcessor(
             val surface = Surface(surfaceTexture)
             surfaceRequest.setTransformationInfoListener(glExecutor) { transformationInfo: SurfaceRequest.TransformationInfo ->
                 var inputFormat = InputFormat.DEFAULT
-                if (surfaceRequest.dynamicRange.is10BitHdrBackport
-                    && transformationInfo.hasCameraTransform()
-                ) {
+                if (surfaceRequest.dynamicRange.is10BitHdrBackport && transformationInfo.hasCameraTransform()) {
                     inputFormat = InputFormat.YUV
                 }
                 openGlRenderer.setInputFormat(inputFormat)
             }
-            surfaceRequest.provideSurface(surface, glExecutor) { _: SurfaceRequest.Result? ->
+
+            surfaceRequest.provideSurface(surface, glExecutor) {
                 surfaceRequest.clearTransformationInfoListener()
                 surfaceTexture.setOnFrameAvailableListener(null)
                 surfaceTexture.release()
@@ -124,7 +122,7 @@ class DefaultSurfaceProcessor(
             return
         }
         executeSafely({
-            val surface = surfaceOutput.getSurface(glExecutor) { _: SurfaceOutput.Event? ->
+            val surface = surfaceOutput.getSurface(glExecutor) {
                 surfaceOutput.close()
                 val removedSurface = outputSurfaces.remove(surfaceOutput)
                 if (removedSurface != null) {
@@ -161,14 +159,12 @@ class DefaultSurfaceProcessor(
             surfaceOutput.updateTransformMatrix(surfaceOutputMatrix, textureMatrix)
 
             try {
-                openGlRenderer.render(
-                    surfaceTexture.timestamp, surfaceOutputMatrix,
-                    surface
-                )
+                openGlRenderer.render(surfaceTexture.timestamp, surfaceOutputMatrix, surface)
             } catch (e: RuntimeException) {
                 // This should not happen. However, when it happens, we catch the exception
                 // to prevent the crash.
                 Log.e(TAG, "Failed to render with OpenGL.", e)
+                throw e
             }
         }
     }
@@ -188,13 +184,12 @@ class DefaultSurfaceProcessor(
 
     private fun initGlRenderer(
         dynamicRange: DynamicRange,
-        shaderProviderOverrides: MutableMap<InputFormat, ShaderProvider>
     ) {
         val initFuture: ListenableFuture<Void> = CallbackToFutureAdapter.getFuture(
             CallbackToFutureAdapter.Resolver<Void> { completer: CallbackToFutureAdapter.Completer<Void?> ->
                 executeSafely({
                     try {
-                        openGlRenderer.init(dynamicRange, shaderProviderOverrides)
+                        openGlRenderer.init(dynamicRange)
                         completer.set(null)
                     } catch (e: RuntimeException) {
                         completer.setException(e)

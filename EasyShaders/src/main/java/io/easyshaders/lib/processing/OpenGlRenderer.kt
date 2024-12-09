@@ -22,17 +22,15 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
-import android.opengl.GLES20
+import android.opengl.GLES32
 import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.util.InputFormat
+import io.easyshaders.lib.processing.program.ShaderProgram
 import io.easyshaders.lib.processing.util.GLUtils
-import io.easyshaders.lib.processing.util.GraphicDeviceInfo
+import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.OutputSurface
-import io.easyshaders.lib.processing.util.Program2D
-import io.easyshaders.lib.processing.util.SamplerShaderProgram
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
@@ -51,24 +49,30 @@ import javax.microedition.khronos.egl.EGL10
  */
 @WorkerThread
 class OpenGlRenderer {
-    protected val isInitialized: AtomicBoolean = AtomicBoolean(false)
-    protected val outputSurfaceMap: MutableMap<Surface, OutputSurface> = mutableMapOf()
-    protected var glThread: Thread? = null
-    protected var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
-    protected var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
-    // protected var mSurfaceAttrib: IntArray = intArrayOf(EGL14.EGL_NONE)
-    protected var surfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
-    protected var eglConfig: EGLConfig? = null
-    protected var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
-    protected var currentSurface: Surface? = null
-    protected var programHandles: MutableMap<InputFormat, Program2D> = mutableMapOf()
-    protected var currentProgram: Program2D? = null
-    protected var currentInputformat: InputFormat = InputFormat.UNKNOWN
+    private val isInitialized: AtomicBoolean = AtomicBoolean(false)
+    private val outputSurfaceMap: MutableMap<Surface, OutputSurface> = mutableMapOf()
+    private var glThread: Thread? = null
+    private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
+    private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
+    private var surfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
+    private var eglConfig: EGLConfig? = null
+    private var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+    private var currentSurface: Surface? = null
+    private var pipelineHandles: Map<InputFormat, ShaderProgram> = mutableMapOf()
+    private var currentProgram: ShaderProgram? = null // TODO: use default? Make no-op implementation?
+    private var currentInputformat: InputFormat = InputFormat.UNKNOWN // TODO: use unknown?
 
     private var externalTextureId = -1
 
 
     private lateinit var initDynamicRange: DynamicRange
+
+
+    init {
+        GLES32.glEnable(GLES32.GL_DEBUG_LOGGED_MESSAGES)
+    }
+
+
     /**
      * Initializes the OpenGLRenderer
      *
@@ -94,15 +98,12 @@ class OpenGlRenderer {
      * This is equivalent to calling [.init] without providing any
      * shader overrides. Default shaders will be used for the dynamic range specified.
      */
-    @JvmOverloads
     fun init(
         dynamicRange: DynamicRange,
-        shaderOverrides: MutableMap<InputFormat, ShaderProvider> = mutableMapOf<InputFormat, ShaderProvider>()
-    ): GraphicDeviceInfo {
+    ) {
         this.initDynamicRange = dynamicRange
         var dynamicRange = dynamicRange
         GLUtils.checkInitializedOrThrow(isInitialized, false)
-        val infoBuilder = GraphicDeviceInfo.Builder()
         try {
             if (dynamicRange.is10BitHdrBackport) {
                 val extensions = getExtensionsBeforeInitialized(dynamicRange)
@@ -113,14 +114,11 @@ class OpenGlRenderer {
                     dynamicRange = DynamicRange.SDR
                 }
                 surfaceAttrib = GLUtils.chooseSurfaceAttrib(eglExtensions, dynamicRange)
-                infoBuilder.setGlExtensions(glExtensions)
-                infoBuilder.setEglExtensions(eglExtensions)
             }
-            createEglContext(dynamicRange, infoBuilder)
-            createTempSurface()
+            createEglContext(dynamicRange)
+            tempSurface = createTempSurface()
             makeCurrent(tempSurface)
-            infoBuilder.setGlVersion(GLUtils.getGlVersionNumber())
-            programHandles = GLUtils.createPrograms(dynamicRange, shaderOverrides)
+            pipelineHandles = GLUtils.createPipelines(dynamicRange)
             externalTextureId = GLUtils.createTexture()
             useAndConfigureProgramWithTexture(externalTextureId)
         } catch (e: IllegalStateException) {
@@ -132,53 +130,6 @@ class OpenGlRenderer {
         }
         glThread = Thread.currentThread()
         isInitialized.set(true)
-        return infoBuilder.build()
-    }
-
-    fun setFragmentShader(dynamicRange: DynamicRange) {
-        GLUtils.checkInitializedOrThrow(isInitialized, true)
-        GLUtils.checkGlThreadOrThrow(glThread)
-
-        val currentPrograms = HashMap(programHandles)
-        // TODO: dispose old programs?
-
-        val provider =  object : ShaderProvider {
-            override fun createFragmentShader(
-                samplerVarName: String,
-                fragCoordsVarName: String
-            ): String = """
-                #extension GL_OES_EGL_image_external : require
-                precision mediump float;
-                varying vec2 $fragCoordsVarName;
-                uniform samplerExternalOES $samplerVarName;
-                uniform float uAlphaScale;
-                
-                vec3 grayscale(vec3 color) {
-                    return vec3(color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722);
-                }
-                
-                void main() {
-                    vec4 src = texture2D($samplerVarName, $fragCoordsVarName);
-                    vec3 grayscale = grayscale(src.rgb);
-                    
-                    gl_FragColor = vec4(grayscale, src.a * uAlphaScale);
-                }
-            """.trimIndent().also {
-                println("========== Create override program!")
-            }
-        }
-
-        val newPrograms = GLUtils.createPrograms(
-            dynamicRange,
-            mapOf(InputFormat.DEFAULT to provider)
-        )
-
-        programHandles = newPrograms
-        useAndConfigureProgramWithTexture(textureId = externalTextureId)
-
-        // TODO: dispose old ones
-
-
     }
 
     /**
@@ -257,10 +208,10 @@ class OpenGlRenderer {
     }
 
     private fun activateExternalTexture(externalTextureId: Int) {
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES32.glActiveTexture(GLES32.GL_TEXTURE0)
         GLUtils.checkGlErrorOrThrow("glActiveTexture")
 
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, externalTextureId)
+        GLES32.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, externalTextureId)
         GLUtils.checkGlErrorOrThrow("glBindTexture")
     }
 
@@ -272,7 +223,8 @@ class OpenGlRenderer {
      * [.registerOutputSurface].
      */
     fun render(
-        timestampNs: Long, textureTransform: FloatArray,
+        timestampNs: Long,
+        textureTransform: FloatArray,
         surface: Surface
     ) {
         GLUtils.checkInitializedOrThrow(isInitialized, true)
@@ -294,20 +246,22 @@ class OpenGlRenderer {
         if (surface !== currentSurface) {
             makeCurrent(outputSurface!!.eglSurface)
             currentSurface = surface
-            GLES20.glViewport(0, 0, outputSurface.width, outputSurface.height)
-            GLES20.glScissor(0, 0, outputSurface.width, outputSurface.height)
+            GLES32.glViewport(0, 0, outputSurface.width, outputSurface.height)
+            GLES32.glScissor(0, 0, outputSurface.width, outputSurface.height)
         }
 
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
-        val program = checkNotNull<Program2D>(currentProgram)
-        if (program is SamplerShaderProgram) {
-            // Copy the texture transformation matrix over.
-            program.updateTextureMatrix(textureTransform)
-        }
+        val program = checkNotNull(currentProgram)
+        program.updateTextureMatrix(textureTransform)
 
         // Draw the rect.
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
-        GLUtils.checkGlErrorOrThrow("glDrawArrays")
+        GLES32.glDrawArrays(GLES32.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
+
+        val error = GLES32.glGetError()
+        if (error != GLES32.GL_NO_ERROR) {
+            val log = GLES32.glGetProgramPipelineInfoLog(program.pipelineProgramId.programHandle)
+            Log.e(TAG, "Pipeline error log: $log")
+        }
 
         // Set timestamp
         EGLExt.eglPresentationTimeANDROID(eglDisplay, outputSurface!!.eglSurface, timestampNs)
@@ -329,11 +283,11 @@ class OpenGlRenderer {
     ): Pair<String, String> {
         GLUtils.checkInitializedOrThrow(isInitialized, false)
         try {
-            createEglContext(dynamicRangeToInitialize,  /*infoBuilder=*/null)
-            createTempSurface()
+            createEglContext(dynamicRangeToInitialize)
+            tempSurface = createTempSurface()
             makeCurrent(tempSurface)
             // eglMakeCurrent() has to be called before checking GL_EXTENSIONS.
-            val glExtensions = GLES20.glGetString(GLES20.GL_EXTENSIONS)
+            val glExtensions = GLES32.glGetString(GLES32.GL_EXTENSIONS)
             val eglExtensions = EGL14.eglQueryString(eglDisplay, EGL14.EGL_EXTENSIONS)
             return Pair(
                 if (glExtensions != null) glExtensions else "", if (eglExtensions != null)
@@ -351,7 +305,6 @@ class OpenGlRenderer {
 
     private fun createEglContext(
         dynamicRange: DynamicRange,
-        infoBuilder: GraphicDeviceInfo.Builder?
     ) {
         eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         check(eglDisplay != EGL14.EGL_NO_DISPLAY) { "Unable to get EGL14 display" }
@@ -361,21 +314,14 @@ class OpenGlRenderer {
             throw IllegalStateException("Unable to initialize EGL14")
         }
 
-        if (infoBuilder != null) {
-            infoBuilder.setEglVersion(version[0].toString() + "." + version[1])
-        }
-
         val rgbBits = if (dynamicRange.is10BitHdrBackport) 10 else 8
         val alphaBits = if (dynamicRange.is10BitHdrBackport) 2 else 8
-        val renderType = if (dynamicRange.is10BitHdrBackport)
-            EGLExt.EGL_OPENGL_ES3_BIT_KHR
-        else
-            EGL14.EGL_OPENGL_ES2_BIT
+        val renderType = if (dynamicRange.is10BitHdrBackport) EGLExt.EGL_OPENGL_ES3_BIT_KHR else EGL14.EGL_OPENGL_ES2_BIT
         // TODO(b/319277249): It will crash on older Samsung devices for HDR video 10-bit
         //  because EGLExt.EGL_RECORDABLE_ANDROID is only supported from OneUI 6.1. We need to
         //  check by GPU Driver version when new OS is release.
-        val recordableAndroid =
-            if (dynamicRange.is10BitHdrBackport) EGL10.EGL_DONT_CARE else EGL14.EGL_TRUE
+        val recordableAndroid = if (dynamicRange.is10BitHdrBackport) EGL10.EGL_DONT_CARE else EGL14.EGL_TRUE
+
         val attribToChooseConfig = intArrayOf(
             EGL14.EGL_RED_SIZE, rgbBits,
             EGL14.EGL_GREEN_SIZE, rgbBits,
@@ -396,7 +342,7 @@ class OpenGlRenderer {
                 numConfigs, 0
             )
         ) { "Unable to find a suitable EGLConfig" }
-        val config = configs[0]
+        val config = configs[0] ?: throw IllegalStateException("EGLConfig was not initialized")
         val attribToCreateContext = intArrayOf(
             EGL14.EGL_CONTEXT_CLIENT_VERSION, if (dynamicRange.is10BitHdrBackport) 3 else 2,
             EGL14.EGL_NONE
@@ -418,14 +364,16 @@ class OpenGlRenderer {
         Log.d(TAG, "EGLContext created, client version " + values[0])
     }
 
-    private fun createTempSurface() {
-        tempSurface = GLUtils.createPBufferSurface(
-            eglDisplay, requireNotNull(eglConfig),  /*width=*/1,  /*height=*/
-            1
+    private fun createTempSurface(): EGLSurface {
+        return GLUtils.createPBufferSurface(
+            eglDisplay,
+            requireNotNull(eglConfig),
+            /*width=*/ 1,
+            /*height=*/ 1
         )
     }
 
-    protected fun makeCurrent(eglSurface: EGLSurface) {
+    private fun makeCurrent(eglSurface: EGLSurface) {
         check(
             EGL14.eglMakeCurrent(
                 eglDisplay,
@@ -436,15 +384,12 @@ class OpenGlRenderer {
         ) { "eglMakeCurrent failed" }
     }
 
-    protected fun useAndConfigureProgramWithTexture(textureId: Int) {
-        val program = programHandles[currentInputformat]
+    private fun useAndConfigureProgramWithTexture(textureId: Int) {
+        val program = pipelineHandles[currentInputformat]
         checkNotNull(program) { "Unable to configure program for input format: $currentInputformat" }
         if (currentProgram !== program) {
             currentProgram = program
             currentProgram!!.use()
-            Log.d(
-                TAG, ("Using program for input format $currentInputformat: $currentProgram")
-            )
         }
 
         // Activate the texture
@@ -453,10 +398,10 @@ class OpenGlRenderer {
 
     private fun releaseInternal() {
         // Delete program
-        for (program in programHandles.values) {
+        for (program in pipelineHandles.values) {
             program.delete()
         }
-        programHandles = mutableMapOf<InputFormat, Program2D>()
+        pipelineHandles = mutableMapOf<InputFormat, ShaderProgram>()
         currentProgram = null
 
         if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
