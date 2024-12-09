@@ -20,7 +20,7 @@ import android.opengl.EGLConfig
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
-import android.opengl.GLES32
+import android.opengl.GLES31
 import android.opengl.Matrix
 import android.util.Log
 import android.util.Size
@@ -171,17 +171,17 @@ object GLUtils {
      */
     fun createTexture(): Int {
         val textures = IntArray(1)
-        GLES32.glGenTextures(1, textures, 0)
+        GLES31.glGenTextures(1, textures, 0)
         checkGlErrorOrThrow("glGenTextures")
 
         val texId = textures[0]
-        GLES32.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId)
+        GLES31.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texId)
         checkGlErrorOrThrow("glBindTexture $texId")
 
-        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_MIN_FILTER, GLES32.GL_NEAREST)
-        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_MAG_FILTER, GLES32.GL_LINEAR)
-        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_WRAP_S, GLES32.GL_CLAMP_TO_EDGE)
-        GLES32.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES32.GL_TEXTURE_WRAP_T, GLES32.GL_CLAMP_TO_EDGE)
+        GLES31.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_MIN_FILTER, GLES31.GL_NEAREST)
+        GLES31.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_MAG_FILTER, GLES31.GL_LINEAR)
+        GLES31.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_WRAP_S, GLES31.GL_CLAMP_TO_EDGE)
+        GLES31.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_WRAP_T, GLES31.GL_CLAMP_TO_EDGE)
         checkGlErrorOrThrow("glTexParameter")
         return texId
     }
@@ -214,8 +214,8 @@ object GLUtils {
      * Checks the gl error and throw.
      */
     fun checkGlErrorOrThrow(op: String) {
-        val error = GLES32.glGetError()
-        check(error == GLES32.GL_NO_ERROR) { "$op: GL error 0x${Integer.toHexString(error)}" }
+        val error = GLES31.glGetError()
+        check(error == GLES31.GL_NO_ERROR) { "$op: GL error 0x${Integer.toHexString(error)}" }
     }
 
     /**
@@ -259,7 +259,7 @@ object GLUtils {
     fun getGlVersionNumber(): String {
         // Logic adapted from CTS Egl14Utils:
         // https://cs.android.com/android/platform/superproject/+/master:cts/tests/tests/opengl/src/android/opengl/cts/Egl14Utils.java;l=46;drc=1c705168ab5118c42e5831cd84871d51ff5176d1
-        val glVersion = GLES32.glGetString(GLES32.GL_VERSION)
+        val glVersion = GLES31.glGetString(GLES31.GL_VERSION)
         val pattern = Pattern.compile("OpenGL ES ([0-9]+)\\.([0-9]+).*")
         val matcher = pattern.matcher(glVersion)
         if (matcher.find()) {
@@ -298,7 +298,7 @@ object GLUtils {
      */
     fun generateFbo(): Int {
         val fbos = IntArray(1)
-        GLES32.glGenFramebuffers(1, fbos, 0)
+        GLES31.glGenFramebuffers(1, fbos, 0)
         checkGlErrorOrThrow("glGenFramebuffers")
         return fbos[0]
     }
@@ -308,7 +308,7 @@ object GLUtils {
      */
     fun generateTexture(): Int {
         val textures = IntArray(1)
-        GLES32.glGenTextures(1, textures, 0)
+        GLES31.glGenTextures(1, textures, 0)
         checkGlErrorOrThrow("glGenTextures")
         return textures[0]
     }
@@ -318,7 +318,7 @@ object GLUtils {
      */
     fun deleteTexture(texture: Int) {
         val textures = intArrayOf(texture)
-        GLES32.glDeleteTextures(1, textures, 0)
+        GLES31.glDeleteTextures(1, textures, 0)
         checkGlErrorOrThrow("glDeleteTextures")
     }
 
@@ -327,7 +327,7 @@ object GLUtils {
      */
     fun deleteFbo(fbo: Int) {
         val fbos = intArrayOf(fbo)
-        GLES32.glDeleteFramebuffers(1, fbos, 0)
+        GLES31.glDeleteFramebuffers(1, fbos, 0)
         checkGlErrorOrThrow("glDeleteFramebuffers")
     }
 }

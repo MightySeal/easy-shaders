@@ -1,6 +1,6 @@
 package io.easyshaders.lib.processing.program
 
-import android.opengl.GLES32
+import android.opengl.GLES31
 import kotlin.reflect.KProperty
 
 
@@ -28,8 +28,8 @@ internal class ShaderPropertyLocation constructor(
         get() {
             if (_value === null) {
                 _value = when (type) {
-                    ShaderPropertyType.ATTRIBUTE -> GLES32.glGetAttribLocation(program.programHandle, name)
-                    ShaderPropertyType.UNIFORM -> GLES32.glGetUniformLocation(program.programHandle, name)
+                    ShaderPropertyType.ATTRIBUTE -> GLES31.glGetAttribLocation(program.programHandle, name)
+                    ShaderPropertyType.UNIFORM -> GLES31.glGetUniformLocation(program.programHandle, name)
                 }
             }
             @Suppress("UNCHECKED_CAST")

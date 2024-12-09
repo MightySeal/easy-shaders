@@ -22,7 +22,7 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
-import android.opengl.GLES32
+import android.opengl.GLES31
 import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
@@ -66,12 +66,6 @@ class OpenGlRenderer {
 
 
     private lateinit var initDynamicRange: DynamicRange
-
-
-    init {
-        GLES32.glEnable(GLES32.GL_DEBUG_LOGGED_MESSAGES)
-    }
-
 
     /**
      * Initializes the OpenGLRenderer
@@ -208,10 +202,10 @@ class OpenGlRenderer {
     }
 
     private fun activateExternalTexture(externalTextureId: Int) {
-        GLES32.glActiveTexture(GLES32.GL_TEXTURE0)
+        GLES31.glActiveTexture(GLES31.GL_TEXTURE0)
         GLUtils.checkGlErrorOrThrow("glActiveTexture")
 
-        GLES32.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, externalTextureId)
+        GLES31.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, externalTextureId)
         GLUtils.checkGlErrorOrThrow("glBindTexture")
     }
 
@@ -246,8 +240,8 @@ class OpenGlRenderer {
         if (surface !== currentSurface) {
             makeCurrent(outputSurface!!.eglSurface)
             currentSurface = surface
-            GLES32.glViewport(0, 0, outputSurface.width, outputSurface.height)
-            GLES32.glScissor(0, 0, outputSurface.width, outputSurface.height)
+            GLES31.glViewport(0, 0, outputSurface.width, outputSurface.height)
+            GLES31.glScissor(0, 0, outputSurface.width, outputSurface.height)
         }
 
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
@@ -255,11 +249,11 @@ class OpenGlRenderer {
         program.updateTextureMatrix(textureTransform)
 
         // Draw the rect.
-        GLES32.glDrawArrays(GLES32.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
+        GLES31.glDrawArrays(GLES31.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
 
-        val error = GLES32.glGetError()
-        if (error != GLES32.GL_NO_ERROR) {
-            val log = GLES32.glGetProgramPipelineInfoLog(program.pipelineProgramId.programHandle)
+        val error = GLES31.glGetError()
+        if (error != GLES31.GL_NO_ERROR) {
+            val log = GLES31.glGetProgramPipelineInfoLog(program.pipelineProgramId.programHandle)
             Log.e(TAG, "Pipeline error log: $log")
         }
 
@@ -287,7 +281,7 @@ class OpenGlRenderer {
             tempSurface = createTempSurface()
             makeCurrent(tempSurface)
             // eglMakeCurrent() has to be called before checking GL_EXTENSIONS.
-            val glExtensions = GLES32.glGetString(GLES32.GL_EXTENSIONS)
+            val glExtensions = GLES31.glGetString(GLES31.GL_EXTENSIONS)
             val eglExtensions = EGL14.eglQueryString(eglDisplay, EGL14.EGL_EXTENSIONS)
             return Pair(
                 if (glExtensions != null) glExtensions else "", if (eglExtensions != null)
