@@ -113,6 +113,11 @@ class OpenGlRenderer {
             createEglContext(dynamicRange)
             tempSurface = createTempSurface()
             makeCurrent(tempSurface)
+
+            // TODO: Rework and split initialization. After this point it's safe to create shaders.
+            //   If we do it as early as possible then the users will have ability to create shaders earlier without limitations
+            //   ATM they need to start creating shaders only after the effect instance is created.
+
             pipelineHandles = GLUtils.createPipelines(dynamicRange)
             externalTextureId = GLUtils.createTexture()
             useAndConfigureProgramWithTexture(externalTextureId)
