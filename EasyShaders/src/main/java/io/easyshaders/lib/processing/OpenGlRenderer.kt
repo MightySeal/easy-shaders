@@ -27,7 +27,8 @@ import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.program.ShaderProgram
+import io.easyshaders.lib.processing.program.FragmentShader
+import io.easyshaders.lib.processing.program.ProgramPipeline
 import io.easyshaders.lib.processing.util.GLUtils
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.OutputSurface
@@ -58,8 +59,8 @@ class OpenGlRenderer {
     private var eglConfig: EGLConfig? = null
     private var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
     private var currentSurface: Surface? = null
-    private var pipelineHandles: Map<InputFormat, ShaderProgram> = mutableMapOf()
-    private var currentProgram: ShaderProgram? = null // TODO: use default? Make no-op implementation?
+    private var pipelineHandles: Map<InputFormat, ProgramPipeline> = mutableMapOf()
+    private var currentProgram: ProgramPipeline? = null // TODO: use default? Make no-op implementation?
     private var currentInputformat: InputFormat = InputFormat.UNKNOWN // TODO: use unknown?
 
     private var externalTextureId = -1
@@ -201,6 +202,11 @@ class OpenGlRenderer {
         }
     }
 
+    fun setFragmentShader(shader: FragmentShader) {
+        TODO("Implement safeguarding against")
+        currentProgram?.fragmentShader = shader
+    }
+
     private fun activateExternalTexture(externalTextureId: Int) {
         GLES31.glActiveTexture(GLES31.GL_TEXTURE0)
         GLUtils.checkGlErrorOrThrow("glActiveTexture")
@@ -247,6 +253,7 @@ class OpenGlRenderer {
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
         val program = checkNotNull(currentProgram)
         program.updateTextureMatrix(textureTransform)
+        program.onBeforeDraw()
 
         // Draw the rect.
         GLES31.glDrawArrays(GLES31.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
@@ -395,7 +402,7 @@ class OpenGlRenderer {
         for (program in pipelineHandles.values) {
             program.delete()
         }
-        pipelineHandles = mutableMapOf<InputFormat, ShaderProgram>()
+        pipelineHandles = mutableMapOf<InputFormat, ProgramPipeline>()
         currentProgram = null
 
         if (eglDisplay != EGL14.EGL_NO_DISPLAY) {

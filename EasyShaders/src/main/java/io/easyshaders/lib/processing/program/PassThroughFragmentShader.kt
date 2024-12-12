@@ -1,29 +1,30 @@
 package io.easyshaders.lib.processing.program
 
-class PassThroughFragmentShader(): FragmentShader {
+import android.opengl.GLES31
+
+class PassThroughFragmentShader(): FragmentShader() {
+
+    override val samplerLocation: ShaderProperty<Int> by lazy {
+        uniformProperty("sTexture", FragmentShaderProgramId(fragmentShaderProgramId!!.handle))
+    }
 
     override fun source(): String = FRAGMENT_SHADER
 
-
-    override fun enable() {
-        TODO("Not yet implemented")
-    }
-
-    override fun disable() {
-        TODO("Not yet implemented")
+    override fun loadLocations(fragmentShaderProgramId: FragmentShaderProgramId) {
+        val samplerLoc = GLES31.glGetUniformLocation(fragmentShaderProgramId.handle, "sTexture")
     }
 
     override fun dispose() {
-        TODO("Not yet implemented")
+        // TODO:
     }
 
     override fun beforeFrameRendered() {
-        TODO("Not yet implemented")
+        // TODO:
     }
 }
 
 private val FRAGMENT_SHADER = """
-    #version 320 es
+    #version 310 es
     #extension GL_OES_EGL_image_external_essl3 : require
     
     precision mediump float;

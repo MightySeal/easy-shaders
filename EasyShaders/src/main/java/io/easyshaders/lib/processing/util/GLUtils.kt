@@ -26,7 +26,7 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.program.ShaderProgram
+import io.easyshaders.lib.processing.program.ProgramPipeline
 import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -151,16 +151,16 @@ object GLUtils {
 
     fun createPipelines(
         dynamicRange: DynamicRange,
-    ): Map<InputFormat, ShaderProgram> {
+    ): Map<InputFormat, ProgramPipeline> {
         return InputFormat.entries
             .associate { inputFormat ->
                 // TODO: implement out input formats
                 val pipeline = when {
-                    inputFormat == InputFormat.DEFAULT -> ShaderProgram()
-                    inputFormat == InputFormat.YUV -> ShaderProgram()
-                    inputFormat == InputFormat.UNKNOWN -> ShaderProgram()
-                    dynamicRange.is10BitHdrBackport -> ShaderProgram()
-                    else -> ShaderProgram()
+                    inputFormat == InputFormat.DEFAULT -> ProgramPipeline()
+                    inputFormat == InputFormat.YUV -> ProgramPipeline()
+                    inputFormat == InputFormat.UNKNOWN -> ProgramPipeline()
+                    dynamicRange.is10BitHdrBackport -> ProgramPipeline()
+                    else -> ProgramPipeline()
                 }
                 inputFormat to pipeline
             }

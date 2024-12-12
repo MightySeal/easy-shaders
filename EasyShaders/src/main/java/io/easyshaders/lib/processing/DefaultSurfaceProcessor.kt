@@ -16,6 +16,7 @@ import androidx.concurrent.futures.CallbackToFutureAdapter
 
 import com.google.common.util.concurrent.ListenableFuture
 import io.easyshaders.lib.processing.concurrent.LibExecutors
+import io.easyshaders.lib.processing.program.FragmentShader
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import io.easyshaders.lib.processing.utils.TAG
@@ -169,6 +170,10 @@ class DefaultSurfaceProcessor(
         }
     }
 
+    fun setEffectShader(shader: FragmentShader) {
+        openGlRenderer.setFragmentShader(shader)
+    }
+
     @WorkerThread
     private fun checkReadyToRelease() {
         if (isReleased && inputSurfaceCount == 0) {
@@ -242,9 +247,7 @@ class DefaultSurfaceProcessor(
     object Factory {
         private var provider =
             Function<DynamicRange, DefaultSurfaceProcessor> { dynamicRange: DynamicRange ->
-                DefaultSurfaceProcessor(
-                    dynamicRange
-                )
+                DefaultSurfaceProcessor(dynamicRange)
             }
 
         /**
