@@ -2,20 +2,16 @@ package io.easyshaders.lib.processing
 
 import android.graphics.SurfaceTexture
 import android.graphics.SurfaceTexture.OnFrameAvailableListener
-import android.os.Handler
-import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
-import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
-import androidx.arch.core.util.Function
 import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceRequest
 import androidx.concurrent.futures.CallbackToFutureAdapter
 
 import com.google.common.util.concurrent.ListenableFuture
-import io.easyshaders.lib.processing.concurrent.LibExecutors
+import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
 import io.easyshaders.lib.processing.program.FragmentShader
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
@@ -23,7 +19,6 @@ import io.easyshaders.lib.processing.utils.TAG
 
 import java.util.LinkedHashMap
 import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -35,18 +30,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * transformation defined in [SurfaceOutput.updateTransformMatrix].
  */
 class DefaultSurfaceProcessor(
+    private val glExecutor: EffectHandlerExecutorService,
     dynamicRange: DynamicRange,
 ) : ReleasableSurfaceProcessor, OnFrameAvailableListener {
 
-    // private val openGlRenderer: OpenGlRendererLegacy
     private val openGlRenderer: OpenGlRenderer
 
-    @VisibleForTesting
-    val glThread: HandlerThread = HandlerThread(TAG + "GL Thread")
-    internal val glExecutor: Executor
-
-    @VisibleForTesting
-    val handler: Handler
     private val isReleaseRequested = AtomicBoolean(false)
     private val textureMatrix = FloatArray(16)
     private val surfaceOutputMatrix = FloatArray(16)
@@ -64,17 +53,11 @@ class DefaultSurfaceProcessor(
     /**
      * Constructs [DefaultSurfaceProcessor] with custom shaders.
      *
-     * @param shaderProviderOverrides custom shader providers for OpenGL rendering, for each input
-     * format.
      * @throws IllegalArgumentException if any shaderProvider override provides invalid shader.
      */
     /** Constructs [DefaultSurfaceProcessor] with default shaders.  */
     init {
-        glThread.start()
-        handler = Handler(glThread.looper)
-        glExecutor = LibExecutors.newHandlerExecutor(handler)
         openGlRenderer = OpenGlRenderer()
-        // openGlRenderer = OpenGlRendererLegacy()
         try {
             initGlRenderer(dynamicRange)
         } catch (e: RuntimeException) {
@@ -113,7 +96,7 @@ class DefaultSurfaceProcessor(
                 inputSurfaceCount--
                 checkReadyToRelease()
             }
-            surfaceTexture.setOnFrameAvailableListener(this, handler) // TODO: why handler?
+            surfaceTexture.setOnFrameAvailableListener(this, glExecutor.handler)
         }, { surfaceRequest.willNotProvideSurface() })
     }
 
@@ -170,8 +153,10 @@ class DefaultSurfaceProcessor(
         }
     }
 
-    fun setEffectShader(shader: FragmentShader) {
-        openGlRenderer.setFragmentShader(shader)
+    fun setEffectShader(creator: () -> FragmentShader) {
+        executeSafely({
+            openGlRenderer.setFragmentShader(creator())
+        })
     }
 
     @WorkerThread
@@ -183,7 +168,7 @@ class DefaultSurfaceProcessor(
             }
             outputSurfaces.clear()
             openGlRenderer.release()
-            glThread.quit()
+            glExecutor.quitThread()
         }
     }
 
@@ -245,26 +230,11 @@ class DefaultSurfaceProcessor(
      *  This is for working around the limit that OpenGL cannot be initialized in unit tests.
      */
     object Factory {
-        private var provider =
-            Function<DynamicRange, DefaultSurfaceProcessor> { dynamicRange: DynamicRange ->
-                DefaultSurfaceProcessor(dynamicRange)
-            }
-
         /**
          * Creates a new [DefaultSurfaceProcessor] with no-op shader.
          */
-        fun newInstance(dynamicRange: DynamicRange): DefaultSurfaceProcessor {
-            return provider.apply(dynamicRange)
-        }
-
-        /**
-         * Overrides the [DefaultSurfaceProcessor] provider for testing.
-         */
-        @VisibleForTesting
-        fun setProvider(
-            provider: Function<DynamicRange, DefaultSurfaceProcessor>
-        ) {
-            this.provider = provider
+        fun newInstance(dynamicRange: DynamicRange, glExecutor: EffectHandlerExecutorService): DefaultSurfaceProcessor {
+            return DefaultSurfaceProcessor(glExecutor, dynamicRange)
         }
     }
 }

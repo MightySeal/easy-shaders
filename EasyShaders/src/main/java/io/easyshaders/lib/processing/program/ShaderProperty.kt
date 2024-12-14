@@ -8,10 +8,9 @@ import kotlin.reflect.KProperty
 //  Consider using it since kotlin 2.2.x
 //  https://youtrack.jetbrains.com/issue/KT-67119/Migration-warning-from-context-receivers-to-context-parameters
 
-fun uniformProperty(
-    name: String,
-    shaderProgramId: ShaderProgramId
-): ShaderProperty<Int> = IntegerPropertyImpl(name, shaderProgramId, ShaderPropertyType.UNIFORM)
+fun FragmentShader.uniformProperty(
+    name: String
+): ShaderProperty<Int> = IntegerPropertyImpl(name, this.shaderProgramId, ShaderPropertyType.UNIFORM)
 
 interface ShaderProperty<T> {
     val value: Int

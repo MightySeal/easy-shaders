@@ -1,7 +1,7 @@
 package io.easyshaders.lib.processing.program
 
 class PassThroughFragmentShader(): FragmentShader(FRAGMENT_SHADER) {
-    override val samplerLocation: ShaderProperty<Int> = uniformProperty("sTexture", FragmentShaderProgramId(shaderProgramId.handle))
+    override val samplerLocation: ShaderProperty<Int> = uniformProperty("sTexture")
 }
 
 private val FRAGMENT_SHADER = """

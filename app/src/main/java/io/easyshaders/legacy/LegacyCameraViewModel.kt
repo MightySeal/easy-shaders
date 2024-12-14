@@ -18,6 +18,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.DefaultCameraEffect
+import io.easyshaders.lib.processing.program.GrayscaleShader
+import io.easyshaders.lib.processing.program.PassThroughFragmentShader
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -58,6 +61,9 @@ class LegacyCameraViewModel @Inject constructor(
         }
     }
 
+    private val cameraEffect: DefaultCameraEffect by lazy {
+        DefaultCameraEffect.create()
+    }
 
     fun startPreview(
         lifecycleOwner: LifecycleOwner,
@@ -69,7 +75,7 @@ class LegacyCameraViewModel @Inject constructor(
             // .setViewPort(previewView.viewPort!!)
             .addUseCase(imageCaptureUseCase)
             .addUseCase(previewUseCase)
-            .addEffect(DefaultCameraEffect.create())
+            .addEffect(cameraEffect)
             .build()
 
         camera = cameraProvider.bindToLifecycle(
@@ -81,6 +87,8 @@ class LegacyCameraViewModel @Inject constructor(
         previewUseCase.surfaceProvider = surfaceProvider
         viewModelScope.launch {
             // uiState.emit(LegacyCameraViewState.Active)
+            delay(1500)
+            cameraEffect.setEffectShader { GrayscaleShader() }
         }
     }
 }

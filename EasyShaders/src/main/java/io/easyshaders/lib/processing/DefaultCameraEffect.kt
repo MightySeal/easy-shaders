@@ -4,6 +4,7 @@ import androidx.camera.core.CameraEffect
 import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceProcessor
 import androidx.core.util.Consumer
+import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
 import io.easyshaders.lib.processing.program.FragmentShader
 import java.util.concurrent.Executor
 
@@ -18,8 +19,8 @@ class DefaultCameraEffect private constructor(
     errorListener
 ) {
 
-    fun setEffectShader(shader: FragmentShader) {
-        surfaceProcessor.setEffectShader(shader)
+    fun setEffectShader(creator: () -> FragmentShader) {
+        surfaceProcessor.setEffectShader(creator)
     }
 
     override fun getSurfaceProcessor(): SurfaceProcessor {
@@ -28,9 +29,10 @@ class DefaultCameraEffect private constructor(
 
     companion object {
         fun create(): DefaultCameraEffect {
-            val processor = DefaultSurfaceProcessor.Factory.newInstance(DynamicRange.SDR)
+            val glExecutor = EffectHandlerExecutorService.instance()
+            val processor = DefaultSurfaceProcessor.Factory.newInstance(DynamicRange.SDR, glExecutor)
 
-            return DefaultCameraEffect(processor.glExecutor, processor)
+            return DefaultCameraEffect(glExecutor, processor)
         }
     }
 }

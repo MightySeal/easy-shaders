@@ -50,11 +50,12 @@ import javax.microedition.khronos.egl.EGL10
  */
 @WorkerThread
 class OpenGlRenderer {
-    private val isInitialized: AtomicBoolean = AtomicBoolean(false)
+    private val isInitialized: AtomicBoolean = AtomicBoolean(false) // TODO: Remove?
     private val outputSurfaceMap: MutableMap<Surface, OutputSurface> = mutableMapOf()
     private var glThread: Thread? = null
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
+    private var eglShareContext: EGLContext = EGL14.EGL_NO_CONTEXT
     private var surfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
     private var eglConfig: EGLConfig? = null
     private var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
@@ -208,8 +209,10 @@ class OpenGlRenderer {
     }
 
     fun setFragmentShader(shader: FragmentShader) {
-        TODO("Implement safeguarding against")
-        currentProgram?.fragmentShader = shader
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setFragmentShader(shader)
     }
 
     private fun activateExternalTexture(externalTextureId: Int) {
@@ -357,9 +360,16 @@ class OpenGlRenderer {
             eglDisplay, config, EGL14.EGL_NO_CONTEXT,
             attribToCreateContext, 0
         )
+
+        val shareContext = EGL14.eglCreateContext(
+            eglDisplay, config, context,
+            attribToCreateContext, 0
+        )
+
         GLUtils.checkEglErrorOrThrow("eglCreateContext")
         eglConfig = config
         eglContext = context
+        eglShareContext = shareContext
 
         // Confirm with query.
         val values = IntArray(1)

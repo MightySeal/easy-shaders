@@ -5,11 +5,7 @@ import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
 
 class ProgramPipeline {
 
-    internal var fragmentShader: FragmentShader = PassThroughFragmentShader()
-        set(value) {
-            field = value
-            TODO("Shader swapping is not supported yet")
-        }
+    private var fragmentShader: FragmentShader = PassThroughFragmentShader()
     private val vertexShader: VertexShader
     val pipelineProgramId: ProgramId
 
@@ -41,7 +37,7 @@ class ProgramPipeline {
 
         vertexShader.use()
 
-        fragmentShader.useInternal(fragmentShader.shaderProgramId)
+        fragmentShader.useInternal()
         checkGlErrorOrThrow("glProgramUniform1i")
         // Set to default value for single camera case
     }
@@ -52,6 +48,16 @@ class ProgramPipeline {
 
     internal fun delete() {
         GLES31.glDeleteProgramPipelines(1, intArrayOf(pipelineProgramId.programHandle), 0)
+    }
+
+    internal fun setFragmentShader(newShader: FragmentShader) {
+        GLES31.glUseProgramStages(pipelineProgramId.programHandle, GLES31.GL_FRAGMENT_SHADER_BIT, newShader.shaderProgramId.handle)
+        checkGlErrorOrThrow("newShader glUseProgramStages")
+        newShader.useInternal()
+        checkGlErrorOrThrow("newShader useInternal")
+
+        // TODO: dispose previous shader
+        fragmentShader = newShader
     }
 
     companion object
