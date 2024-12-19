@@ -12,7 +12,6 @@ abstract class FragmentShader(val source: String): ShaderProgram {
     abstract val samplerLocation: ShaderProperty<Int>
 
     init {
-
         val currentContext = EGL14.eglGetCurrentContext()
         if (currentContext == EGL14.EGL_NO_CONTEXT) {
             throw IllegalStateException("No EGL context is attached to the thread")
@@ -36,7 +35,12 @@ abstract class FragmentShader(val source: String): ShaderProgram {
     open fun dispose() {}
     open fun beforeFrameRendered() {}
 
+    internal fun init() {
+
+    }
+
     internal fun disposeInternal() {
+        GLES31.glDeleteShader(shaderProgramId.handle)
         dispose()
     }
     internal fun useInternal() {

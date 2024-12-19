@@ -17,9 +17,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.easyshaders.lib.processing.DefaultCameraEffect
+import io.easyshaders.lib.processing.CameraEffectManager
 import io.easyshaders.lib.processing.program.GrayscaleShader
-import io.easyshaders.lib.processing.program.PassThroughFragmentShader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,8 +50,17 @@ class LegacyCameraViewModel @Inject constructor(
         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
         .build()
 
+    private val useCaseBuilder by lazy {
+        UseCaseGroup.Builder()
+            // .setViewPort(previewView.viewPort!!)
+            .addUseCase(imageCaptureUseCase)
+            .addUseCase(previewUseCase)
+    }
+
     val uiState: Flow<LegacyCameraViewState>
         field = MutableStateFlow<LegacyCameraViewState>(LegacyCameraViewState.Loading)
+
+    // lateinit var cameraEffect: CameraEffectManager
 
     init {
         viewModelScope.launch {
@@ -61,8 +69,8 @@ class LegacyCameraViewModel @Inject constructor(
         }
     }
 
-    private val cameraEffect: DefaultCameraEffect by lazy {
-        DefaultCameraEffect.create()
+    private val cameraEffect: CameraEffectManager by lazy {
+        CameraEffectManager.create()
     }
 
     fun startPreview(
@@ -71,10 +79,7 @@ class LegacyCameraViewModel @Inject constructor(
     ) {
         cameraProvider.unbindAll()
 
-        val useCaseGroup = UseCaseGroup.Builder()
-            // .setViewPort(previewView.viewPort!!)
-            .addUseCase(imageCaptureUseCase)
-            .addUseCase(previewUseCase)
+        val useCaseGroup = useCaseBuilder
             .addEffect(cameraEffect)
             .build()
 
@@ -85,10 +90,27 @@ class LegacyCameraViewModel @Inject constructor(
         )
 
         previewUseCase.surfaceProvider = surfaceProvider
+
         viewModelScope.launch {
             // uiState.emit(LegacyCameraViewState.Active)
             delay(1500)
             cameraEffect.setEffectShader { GrayscaleShader() }
+
+            /*delay(3000)
+            cameraProvider.unbindAll()
+
+
+            val newGroup = UseCaseGroup.Builder()
+                // .setViewPort(previewView.viewPort!!)
+                .addUseCase(imageCaptureUseCase)
+                .addUseCase(previewUseCase)
+                .build()
+
+            camera = cameraProvider.bindToLifecycle(
+                lifecycleOwner = lifecycleOwner,
+                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA,
+                useCaseGroup = newGroup,
+            )*/
         }
     }
 }

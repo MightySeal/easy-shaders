@@ -51,10 +51,15 @@ class ProgramPipeline {
     }
 
     internal fun setFragmentShader(newShader: FragmentShader) {
+        val oldShader = fragmentShader
+
         GLES31.glUseProgramStages(pipelineProgramId.programHandle, GLES31.GL_FRAGMENT_SHADER_BIT, newShader.shaderProgramId.handle)
         checkGlErrorOrThrow("newShader glUseProgramStages")
         newShader.useInternal()
         checkGlErrorOrThrow("newShader useInternal")
+
+        oldShader.disposeInternal()
+
 
         // TODO: dispose previous shader
         fragmentShader = newShader

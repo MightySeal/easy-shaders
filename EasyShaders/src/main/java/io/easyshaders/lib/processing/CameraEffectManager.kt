@@ -8,7 +8,7 @@ import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
 import io.easyshaders.lib.processing.program.FragmentShader
 import java.util.concurrent.Executor
 
-class DefaultCameraEffect private constructor(
+class CameraEffectManager private constructor(
     executor: Executor,
     private val surfaceProcessor: DefaultSurfaceProcessor,
     errorListener: Consumer<Throwable> = Consumer { },
@@ -28,11 +28,11 @@ class DefaultCameraEffect private constructor(
     }
 
     companion object {
-        fun create(): DefaultCameraEffect {
+        fun create(): CameraEffectManager {
             val glExecutor = EffectHandlerExecutorService.instance()
             val processor = DefaultSurfaceProcessor.Factory.newInstance(DynamicRange.SDR, glExecutor)
 
-            return DefaultCameraEffect(glExecutor, processor)
+            return CameraEffectManager(glExecutor, processor)
         }
     }
 }
