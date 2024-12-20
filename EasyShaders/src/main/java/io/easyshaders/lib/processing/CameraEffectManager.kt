@@ -19,8 +19,8 @@ class CameraEffectManager private constructor(
     errorListener
 ) {
 
-    fun setEffectShader(creator: () -> FragmentShader) {
-        surfaceProcessor.setEffectShader(creator)
+    fun setEffectShader(shader: FragmentShader) {
+        surfaceProcessor.setEffectShader(shader)
     }
 
     override fun getSurfaceProcessor(): SurfaceProcessor {

@@ -108,6 +108,13 @@ internal class OpenGlRendererNew(
         currentProgram?.setFragmentShader(shader)
     }
 
+    /*fun setFragmentShaderUnsafe(shader: FragmentShader) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        // GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setFragmentShader(shader)
+    }*/
+
     fun release() {
         if (!isInitialized.getAndSet(false)) {
             return

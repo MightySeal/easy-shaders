@@ -1,7 +1,11 @@
-package io.easyshaders.lib.processing.program
+package io.easyshaders.lib.processing.program.builtin
+
+import io.easyshaders.lib.processing.program.FragmentShader
+import io.easyshaders.lib.processing.program.ShaderProperty
+import io.easyshaders.lib.processing.program.uniformIntProperty
 
 class GrayscaleShader: FragmentShader(SHADER) {
-    override val samplerLocation: ShaderProperty<Int> = uniformProperty("sTexture")
+    override val samplerLocation: ShaderProperty<Int> = uniformIntProperty("sTexture")
 }
 
 
@@ -16,10 +20,6 @@ private val SHADER = """
     out vec4 outColor;
     
     vec3 grayscale(vec3 color) {
-        // return color * vec3(0.2126, 0.7152, 0.0722);
-        // Exactly the same as:
-        // return vec3(color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722); // Looks kind of better
-        
         return vec3(dot(color, vec3(0.2126, 0.7152, 0.0722)));
     }
 

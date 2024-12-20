@@ -46,12 +46,14 @@ class EffectHandlerExecutorService private constructor(
     }
 
     companion object Factory {
-        private val instance by lazy {
+        private val instance by lazy(::create)
+
+        fun instance(): EffectHandlerExecutorService = create()
+
+        private fun create(): EffectHandlerExecutorService {
             val glThread: HandlerThread = HandlerThread(TAG + "GL Thread").also(HandlerThread::start)
             val handler = Handler(glThread.looper)
-            EffectHandlerExecutorService(glThread, handler)
+            return EffectHandlerExecutorService(glThread, handler)
         }
-
-        fun instance(): EffectHandlerExecutorService = instance
     }
 }

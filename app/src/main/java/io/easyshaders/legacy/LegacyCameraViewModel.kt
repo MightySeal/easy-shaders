@@ -18,7 +18,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.CameraEffectManager
-import io.easyshaders.lib.processing.program.GrayscaleShader
+import io.easyshaders.lib.processing.program.FragmentShader
+import io.easyshaders.lib.processing.program.builtin.BrightnessContrastShader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,8 @@ class LegacyCameraViewModel @Inject constructor(
 
     private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var camera: Camera
+
+    private var currentEffect: FragmentShader? = null
 
     private val aspectRatioStrategy =
         AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_NONE)
@@ -52,7 +55,6 @@ class LegacyCameraViewModel @Inject constructor(
 
     private val useCaseBuilder by lazy {
         UseCaseGroup.Builder()
-            // .setViewPort(previewView.viewPort!!)
             .addUseCase(imageCaptureUseCase)
             .addUseCase(previewUseCase)
     }
@@ -60,12 +62,10 @@ class LegacyCameraViewModel @Inject constructor(
     val uiState: Flow<LegacyCameraViewState>
         field = MutableStateFlow<LegacyCameraViewState>(LegacyCameraViewState.Loading)
 
-    // lateinit var cameraEffect: CameraEffectManager
-
     init {
         viewModelScope.launch {
             cameraProvider = ProcessCameraProvider.getInstance(application).await()
-            uiState.emit(LegacyCameraViewState.Ready)
+            uiState.emit(LegacyCameraViewState.Ready())
         }
     }
 
@@ -91,26 +91,51 @@ class LegacyCameraViewModel @Inject constructor(
 
         previewUseCase.surfaceProvider = surfaceProvider
 
+        // For testing purposes
         viewModelScope.launch {
-            // uiState.emit(LegacyCameraViewState.Active)
             delay(1500)
-            cameraEffect.setEffectShader { GrayscaleShader() }
+            val brightnessContrast = BrightnessContrastShader()
+            brightnessContrast.brightness.value = 0f
+            brightnessContrast.contrast.value = 1f
 
-            /*delay(3000)
-            cameraProvider.unbindAll()
+            currentEffect = brightnessContrast
+
+            cameraEffect.setEffectShader(brightnessContrast)
+            uiState.emit(
+                LegacyCameraViewState.Ready(
+                    controls = listOf(
+                        Control.FloatSeek(
+                            title = "Brightness",
+                            id = "brightness",
+                            range = -1f..1f,
+                            initial = 0f,
+                            step = 0.01f
+                        ),
+                        Control.FloatSeek(
+                            title = "Contrast",
+                            id = "contrast",
+                            range = -1f..1f,
+                            initial = 0f,
+                            step = 0.01f
+                        )
+                    )
+                )
+            )
+        }
+    }
 
 
-            val newGroup = UseCaseGroup.Builder()
-                // .setViewPort(previewView.viewPort!!)
-                .addUseCase(imageCaptureUseCase)
-                .addUseCase(previewUseCase)
-                .build()
+    fun onControlChange(change: ControlValue) {
+        when (change) {
+            is ControlValue.FloatValue -> {
+                val shaderEffect = currentEffect as? BrightnessContrastShader
+                when (change.id) {
+                    "brightness" -> shaderEffect?.brightness?.value = change.value
+                    "contrast" -> shaderEffect?.contrast?.value = change.value + 1f
+                }
+            }
 
-            camera = cameraProvider.bindToLifecycle(
-                lifecycleOwner = lifecycleOwner,
-                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA,
-                useCaseGroup = newGroup,
-            )*/
+            is ControlValue.BooleanValue -> {}
         }
     }
 }

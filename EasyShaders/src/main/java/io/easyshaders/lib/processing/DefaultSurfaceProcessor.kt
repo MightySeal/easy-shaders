@@ -129,7 +129,6 @@ class DefaultSurfaceProcessor(
      * Release the [DefaultSurfaceProcessor].
      */
     override fun release() {
-        Log.i(TAG, "========== release")
         if (isReleaseRequested.getAndSet(true)) {
             return
         }
@@ -164,6 +163,13 @@ class DefaultSurfaceProcessor(
     fun setEffectShader(creator: () -> FragmentShader) {
         executeSafely({
             openGlRenderer.setFragmentShader(creator())
+        })
+    }
+
+    fun setEffectShader(shader: FragmentShader) {
+        // openGlRenderer.setFragmentShader(shader)
+        executeSafely({
+            openGlRenderer.setFragmentShader(shader)
         })
     }
 

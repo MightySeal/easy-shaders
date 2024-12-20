@@ -8,6 +8,11 @@ import io.easyshaders.lib.processing.util.GLUtils.VERTEX_BUF
 import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
 import io.easyshaders.lib.processing.util.GLUtils.create4x4IdentityMatrix
 
+/**
+ * Vertex shader program.
+ * Implemented to have eager initialization because it is an internal API which is guaranteed to
+ * be called on a thread that has EGL context.
+ */
 internal class VertexShader: ShaderProgram {
     val shaderProgramId: VertexShaderProgramId
     private val texMatrixLocation: Int

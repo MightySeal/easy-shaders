@@ -1,51 +1,59 @@
 package io.easyshaders.lib.processing.program
 
-import android.opengl.EGL14
 import android.opengl.GLES31
-import android.util.Log
-import io.easyshaders.lib.processing.util.GLUtils.TAG
-import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
 
+/**
+ * Fragment shader program.
+ * Implemented to have lazy initialization because it is an internal API which is guaranteed to
+ * be called on a thread that has EGL context.
+ */
 abstract class FragmentShader(val source: String): ShaderProgram {
+    internal val properties = mutableSetOf<LazyShaderProperty<out Number>>()
 
-    val shaderProgramId: FragmentShaderProgramId
+    internal val shaderProgramIdProp: FragmentShaderProgramIdProperty = FragmentShaderProgramIdProperty(source)
+    val shaderProgramId: FragmentShaderProgramId by shaderProgramIdProp
     abstract val samplerLocation: ShaderProperty<Int>
 
-    init {
-        val currentContext = EGL14.eglGetCurrentContext()
-        if (currentContext == EGL14.EGL_NO_CONTEXT) {
-            throw IllegalStateException("No EGL context is attached to the thread")
-        }
-
-        // TODO: Add an option to choose between eager/lazy initialization
-        shaderProgramId = FragmentShaderProgramId(GLES31.glCreateShaderProgramv(GLES31.GL_FRAGMENT_SHADER, arrayOf(source)))
-        checkGlErrorOrThrow("fragmentShaderProgramId $shaderProgramId")
-
-        val linkStatus = IntArray(1)
-        GLES31.glGetProgramiv(shaderProgramId.handle, GLES31.GL_LINK_STATUS, linkStatus,  /*offset=*/0)
-        if (linkStatus[0] != GLES31.GL_TRUE) {
-            Log.e(TAG, GLES31.glGetProgramInfoLog(shaderProgramId.handle))
-        }
-
-        loadLocations()
-    }
-
-    fun loadLocations() {}
-    open fun use() {}
-    open fun dispose() {}
+    open fun onAttach() {}
     open fun beforeFrameRendered() {}
+    open fun cleanup() {}
 
-    internal fun init() {
-
+    fun dispose() {
+        disposeInternal()
+        cleanup()
     }
 
     internal fun disposeInternal() {
         GLES31.glDeleteShader(shaderProgramId.handle)
-        dispose()
     }
+
     internal fun useInternal() {
-        Log.i(TAG, "========== ${this::class.simpleName}, ${hashCode()} useInternal ${shaderProgramId.handle}, ${samplerLocation.value}")
         GLES31.glProgramUniform1i(shaderProgramId.handle, samplerLocation.value, 0)
-        use()
+        onAttach()
     }
+}
+
+
+fun FragmentShader.uniformIntProperty(
+    name: String,
+    default: Int? = null,
+): ShaderProperty<Int> = IntLazyShaderProperty(
+    name,
+    this.shaderProgramIdProp,
+    ShaderPropertyType.UNIFORM,
+    default
+).also {
+    this.properties.add(it)
+}
+
+fun FragmentShader.uniformFloatProperty(
+    name: String,
+    default: Float? = null,
+): ShaderProperty<Float> = FloatLazyShaderProperty(
+    name,
+    this.shaderProgramIdProp,
+    ShaderPropertyType.UNIFORM,
+    default
+).also {
+    this.properties.add(it)
 }

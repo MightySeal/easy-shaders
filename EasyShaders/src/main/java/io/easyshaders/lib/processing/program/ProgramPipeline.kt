@@ -1,6 +1,7 @@
 package io.easyshaders.lib.processing.program
 
 import android.opengl.GLES31
+import io.easyshaders.lib.processing.program.builtin.PassThroughFragmentShader
 import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
 
 class ProgramPipeline {
@@ -43,6 +44,10 @@ class ProgramPipeline {
     }
 
     internal fun onBeforeDraw() {
+        fragmentShader.properties.forEach {
+            it.flush()
+        }
+
         fragmentShader.beforeFrameRendered()
     }
 
@@ -51,15 +56,10 @@ class ProgramPipeline {
     }
 
     internal fun setFragmentShader(newShader: FragmentShader) {
-        val oldShader = fragmentShader
-
         GLES31.glUseProgramStages(pipelineProgramId.programHandle, GLES31.GL_FRAGMENT_SHADER_BIT, newShader.shaderProgramId.handle)
         checkGlErrorOrThrow("newShader glUseProgramStages")
         newShader.useInternal()
         checkGlErrorOrThrow("newShader useInternal")
-
-        oldShader.disposeInternal()
-
 
         // TODO: dispose previous shader
         fragmentShader = newShader

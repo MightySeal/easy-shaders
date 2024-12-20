@@ -8,7 +8,11 @@ interface ShaderProgramId {
 value class VertexShaderProgramId(override val handle: Int): ShaderProgramId
 
 @JvmInline
-value class FragmentShaderProgramId(override val handle: Int): ShaderProgramId
+value class FragmentShaderProgramId(override val handle: Int): ShaderProgramId {
+    companion object {
+        val INVALID_SHADER = FragmentShaderProgramId(0)
+    }
+}
 
 @JvmInline
 value class ProgramId(val programHandle: Int) {

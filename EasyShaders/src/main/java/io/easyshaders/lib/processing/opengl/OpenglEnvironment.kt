@@ -18,7 +18,7 @@ import java.lang.IllegalStateException
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGL10
 
-// TOOD: Private constructor
+// TODO: Private constructor
 @WorkerThread
 internal class OpenglEnvironment constructor() {
     private val isInitialized: AtomicBoolean = AtomicBoolean(false)
@@ -48,6 +48,7 @@ internal class OpenglEnvironment constructor() {
             }
 
             // TODO: Simplify with is10BitHdrBackport, bc anyway egl env is created first.
+            //   Never destroyed in case it fallbacks to SDR if HDR was requested (?!)
             //   Key difference is in surface attrs
             eglEnv = createEglContext(dynamicRange)
             tempSurface = createTempSurface()
