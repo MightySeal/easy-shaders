@@ -12,8 +12,7 @@ import androidx.concurrent.futures.CallbackToFutureAdapter
 
 import com.google.common.util.concurrent.ListenableFuture
 import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
-import io.easyshaders.lib.processing.opengl.OpenGlRendererNew
-import io.easyshaders.lib.processing.opengl.OpenglEnvironment
+import io.easyshaders.lib.processing.opengl.OpenGlRenderer
 import io.easyshaders.lib.processing.program.FragmentShader
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
@@ -36,9 +35,7 @@ class DefaultSurfaceProcessor(
     dynamicRange: DynamicRange,
 ) : ReleasableSurfaceProcessor, OnFrameAvailableListener {
 
-    // private val openGlRenderer: OpenGlRenderer
-    private val openGlEnvironment: OpenglEnvironment
-    private val openGlRenderer: OpenGlRendererNew
+    private val openGlRenderer: OpenGlRenderer
 
     private val isReleaseRequested = AtomicBoolean(false)
     private val textureMatrix = FloatArray(16)
@@ -61,10 +58,7 @@ class DefaultSurfaceProcessor(
      */
     /** Constructs [DefaultSurfaceProcessor] with default shaders.  */
     init {
-        // openGlRenderer = OpenGlRenderer()
-        openGlEnvironment = OpenglEnvironment()
-        openGlRenderer = OpenGlRendererNew(openGlEnvironment)
-        // openGlRenderer = OpenGlRendererNew(OpenglEnvironment.instance())
+        openGlRenderer = OpenGlRenderer()
         try {
             initGlRenderer(dynamicRange)
         } catch (e: RuntimeException) {
@@ -181,7 +175,6 @@ class DefaultSurfaceProcessor(
                 surfaceOutput.close()
             }
             outputSurfaces.clear()
-            openGlEnvironment.release()
             openGlRenderer.release()
             glExecutor.quitThread()
         }
@@ -194,7 +187,6 @@ class DefaultSurfaceProcessor(
             CallbackToFutureAdapter.Resolver<Void> { completer: CallbackToFutureAdapter.Completer<Void?> ->
                 executeSafely({
                     try {
-                        openGlEnvironment.init(dynamicRange)
                         openGlRenderer.init(dynamicRange)
                         completer.set(null)
                     } catch (e: RuntimeException) {

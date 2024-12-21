@@ -73,6 +73,10 @@ internal class IntLazyShaderProperty(
             GLES31.glProgramUniform1i(programId.handle, location, newValue)
         }
     }
+
+    /*fun a() {
+        GLES31.getActiveUniform
+    }*/
 }
 
 internal class FloatLazyShaderProperty(
