@@ -5,7 +5,6 @@ import androidx.camera.core.DynamicRange
 import androidx.camera.core.SurfaceProcessor
 import androidx.core.util.Consumer
 import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
-import io.easyshaders.lib.processing.program.FragmentShader
 import java.util.concurrent.Executor
 
 class CameraEffectManager private constructor(
@@ -19,8 +18,12 @@ class CameraEffectManager private constructor(
     errorListener
 ) {
 
-    fun setEffectShader(shader: FragmentShader) {
-        surfaceProcessor.setEffectShader(shader)
+    fun setEffectShaderSource(shaderSource: String, beforeRender: PreFrameCallback) {
+        surfaceProcessor.setEffectShader(shaderSource, beforeRender)
+    }
+
+    fun setProperty(name: String, value: Float) {
+        surfaceProcessor.setProperty(name, value)
     }
 
     override fun getSurfaceProcessor(): SurfaceProcessor {

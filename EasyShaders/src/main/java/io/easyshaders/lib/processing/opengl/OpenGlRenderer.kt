@@ -27,7 +27,8 @@ import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.program.FragmentShader
+import io.easyshaders.lib.processing.PreFrameCallback
+import io.easyshaders.lib.processing.program.FragmentShaderProgram
 import io.easyshaders.lib.processing.program.ProgramPipeline
 import io.easyshaders.lib.processing.util.GLUtils
 import io.easyshaders.lib.processing.util.InputFormat
@@ -50,7 +51,7 @@ import javax.microedition.khronos.egl.EGL10
  */
 @WorkerThread
 class OpenGlRenderer {
-    private val isInitialized: AtomicBoolean = AtomicBoolean(false) // TODO: Remove?
+    private val isInitialized: AtomicBoolean = AtomicBoolean(false)
     private val outputSurfaceMap: MutableMap<Surface, OutputSurface> = mutableMapOf()
     private var glThread: Thread? = null
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
@@ -62,7 +63,7 @@ class OpenGlRenderer {
     private var currentSurface: Surface? = null
     private var pipelineHandles: Map<InputFormat, ProgramPipeline> = mutableMapOf()
     private var currentProgram: ProgramPipeline? = null // TODO: use default? Make no-op implementation?
-    private var currentInputformat: InputFormat = InputFormat.UNKNOWN // TODO: use unknown?
+    private var currentInputformat: InputFormat = InputFormat.UNKNOWN
 
     private var externalTextureId = -1
 
@@ -208,11 +209,18 @@ class OpenGlRenderer {
         }
     }
 
-    fun setFragmentShader(shader: FragmentShader) {
+    fun setFragmentShader(source: String, beforeRender: PreFrameCallback) {
         GLUtils.checkInitializedOrThrow(isInitialized, true)
         GLUtils.checkGlThreadOrThrow(glThread)
 
-        currentProgram?.setFragmentShader(shader)
+        currentProgram?.setFragmentShader(source, beforeRender)
+    }
+
+    fun setProperty(name: String, value: Float) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setProperty(name, value)
     }
 
     private fun activateExternalTexture(externalTextureId: Int) {
@@ -261,7 +269,7 @@ class OpenGlRenderer {
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
         val program = checkNotNull(currentProgram)
         program.updateTextureMatrix(textureTransform)
-        program.onBeforeDraw()
+        program.onBeforeDraw(outputSurface!!.width, outputSurface.height)
 
         // Draw the rect.
         GLES31.glDrawArrays(GLES31.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)

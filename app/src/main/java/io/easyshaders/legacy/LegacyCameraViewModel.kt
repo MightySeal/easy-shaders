@@ -18,12 +18,14 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.CameraEffectManager
-import io.easyshaders.lib.processing.program.FragmentShader
-import io.easyshaders.lib.processing.program.builtin.BrightnessContrastShader
+import io.easyshaders.lib.processing.PreFrameCallback
+import io.easyshaders.lib.processing.program.FragmentShaderProgram
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -35,8 +37,6 @@ class LegacyCameraViewModel @Inject constructor(
 
     private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var camera: Camera
-
-    private var currentEffect: FragmentShader? = null
 
     private val aspectRatioStrategy =
         AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_NONE)
@@ -91,16 +91,37 @@ class LegacyCameraViewModel @Inject constructor(
 
         previewUseCase.surfaceProvider = surfaceProvider
 
-        // For testing purposes
+
         viewModelScope.launch {
             delay(1500)
-            val brightnessContrast = BrightnessContrastShader()
-            brightnessContrast.brightness.value = 0f
-            brightnessContrast.contrast.value = 1f
 
-            currentEffect = brightnessContrast
+            cameraEffect.setEffectShaderSource(
+                loadShaderCode(application, "brightness_contrast.frag"),
+                object : PreFrameCallback {
+                    override fun onPreFrame(
+                        shader: FragmentShaderProgram,
+                        frameCount: Int,
+                        width: Int,
+                        height: Int
+                    ) {
 
-            cameraEffect.setEffectShader(brightnessContrast)
+                    }
+                }
+            )
+
+            cameraEffect.setEffectShaderSource(
+                loadShaderCode(application, "brightness_contrast.frag")
+            ) { shader: FragmentShaderProgram, frameCount: Int, width: Int, height: Int ->
+                shader.setProperty("brightness", frameCount / 100f)
+            }
+
+
+
+
+
+            cameraEffect.setProperty("brightness", 0f)
+            cameraEffect.setProperty("contrast", 1f)
+
             uiState.emit(
                 LegacyCameraViewState.Ready(
                     controls = listOf(
@@ -124,18 +145,24 @@ class LegacyCameraViewModel @Inject constructor(
         }
     }
 
-
     fun onControlChange(change: ControlValue) {
         when (change) {
             is ControlValue.FloatValue -> {
-                val shaderEffect = currentEffect as? BrightnessContrastShader
                 when (change.id) {
-                    "brightness" -> shaderEffect?.brightness?.value = change.value
-                    "contrast" -> shaderEffect?.contrast?.value = change.value + 1f
+                    "brightness" -> cameraEffect.setProperty("brightness", change.value)
+                    "contrast" -> cameraEffect.setProperty("contrast", change.value + 1f)
                 }
             }
 
             is ControlValue.BooleanValue -> {}
+        }
+    }
+
+    private suspend fun loadShaderCode(context: Context, shaderName: String): String {
+        return withContext(Dispatchers.IO) {
+            context.assets.open("shaders/$shaderName").use { inputStream ->
+                inputStream.bufferedReader().readText()
+            }
         }
     }
 }

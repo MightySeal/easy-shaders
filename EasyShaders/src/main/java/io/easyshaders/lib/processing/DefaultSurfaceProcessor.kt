@@ -13,7 +13,6 @@ import androidx.concurrent.futures.CallbackToFutureAdapter
 import com.google.common.util.concurrent.ListenableFuture
 import io.easyshaders.lib.processing.concurrent.EffectHandlerExecutorService
 import io.easyshaders.lib.processing.opengl.OpenGlRenderer
-import io.easyshaders.lib.processing.program.FragmentShader
 import io.easyshaders.lib.processing.util.InputFormat
 import io.easyshaders.lib.processing.util.is10BitHdrBackport
 import io.easyshaders.lib.processing.utils.TAG
@@ -154,16 +153,15 @@ class DefaultSurfaceProcessor(
         }
     }
 
-    fun setEffectShader(creator: () -> FragmentShader) {
+    fun setEffectShader(source: String, beforeRender: PreFrameCallback) {
         executeSafely({
-            openGlRenderer.setFragmentShader(creator())
+            openGlRenderer.setFragmentShader(source, beforeRender)
         })
     }
 
-    fun setEffectShader(shader: FragmentShader) {
-        // openGlRenderer.setFragmentShader(shader)
+    fun setProperty(name: String, value: Float) {
         executeSafely({
-            openGlRenderer.setFragmentShader(shader)
+            openGlRenderer.setProperty(name, value)
         })
     }
 
