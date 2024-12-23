@@ -96,28 +96,10 @@ class LegacyCameraViewModel @Inject constructor(
             delay(1500)
 
             cameraEffect.setEffectShaderSource(
-                loadShaderCode(application, "brightness_contrast.frag"),
-                object : PreFrameCallback {
-                    override fun onPreFrame(
-                        shader: FragmentShaderProgram,
-                        frameCount: Int,
-                        width: Int,
-                        height: Int
-                    ) {
-
-                    }
-                }
-            )
-
-            cameraEffect.setEffectShaderSource(
                 loadShaderCode(application, "brightness_contrast.frag")
             ) { shader: FragmentShaderProgram, frameCount: Int, width: Int, height: Int ->
-                shader.setProperty("brightness", frameCount / 100f)
+                // NO-OP
             }
-
-
-
-
 
             cameraEffect.setProperty("brightness", 0f)
             cameraEffect.setProperty("contrast", 1f)
