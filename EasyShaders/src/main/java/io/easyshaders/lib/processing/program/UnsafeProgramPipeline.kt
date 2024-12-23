@@ -1,31 +1,20 @@
 package io.easyshaders.lib.processing.program
 
 import android.opengl.GLES31
-import io.easyshaders.lib.processing.PreFrameCallback
+import io.easyshaders.lib.processing.FragmentShader
 import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
 
 internal class UnsafeProgramPipeline: ProgramPipeline {
 
-    private var fragmentSource: String = FRAGMENT_SHADER
-    private var fragmentShader: UnsafeFragmentShader = UnsafeFragmentShader(fragmentSource)
-    private var beforeRender: PreFrameCallback = object: PreFrameCallback {
-        override fun onPreFrame(
-            shader: FragmentShaderProgram,
-            frameCount: Int,
-            width: Int,
-            height: Int
-        ) {
-            // NO-OP
-        }
-    }
-    private var frameCount = 0
-
-    private val vertexShader: VertexShader
+    private val vertexShader: VertexShader = VertexShader()
     override val pipelineProgramId: ProgramId
+
+    private var fragmentShaderUserHandle: FragmentShader = PASSTHROUGH
+    private var fragmentShader: UnsafeFragmentShader = UnsafeFragmentShader(fragmentShaderUserHandle.source)
+    private var frameCount = 0
 
     // Reference: https://www.khronos.org/opengl/wiki/Example/GLSL_Separate_Program_Basics
     init {
-        vertexShader = VertexShader()
 
         val pipelineIdHolder = IntArray(1)
         GLES31.glGenProgramPipelines(1, pipelineIdHolder, 0)
@@ -56,7 +45,7 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
     }
 
     override fun onBeforeDraw(width: Int, height: Int) {
-        beforeRender.onPreFrame(fragmentShader, frameCount, width, height)
+        fragmentShaderUserHandle.onPreFrame(fragmentShader, frameCount, width, height)
         frameCount++
     }
 
@@ -64,10 +53,9 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
         GLES31.glDeleteProgramPipelines(1, intArrayOf(pipelineProgramId.programHandle), 0)
     }
 
-    override fun setFragmentShader(source: String, beforeRender: PreFrameCallback) {
-        fragmentSource = source
-        fragmentShader = UnsafeFragmentShader(source)
-        this.beforeRender = beforeRender
+    override fun setFragmentShader(shader: FragmentShader) {
+        fragmentShaderUserHandle = shader
+        fragmentShader = UnsafeFragmentShader(shader.source)
 
         GLES31.glUseProgramStages(pipelineProgramId.programHandle, GLES31.GL_FRAGMENT_SHADER_BIT, fragmentShader.shaderProgramId.handle)
         checkGlErrorOrThrow("newShader glUseProgramStages")
@@ -98,3 +86,5 @@ private val FRAGMENT_SHADER = """
         outColor = texture(sTexture, vTextureCoord);
     }
 """.trimIndent().trim()
+
+private val PASSTHROUGH = FragmentShader(FRAGMENT_SHADER)

@@ -27,8 +27,7 @@ import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.PreFrameCallback
-import io.easyshaders.lib.processing.program.FragmentShaderProgram
+import io.easyshaders.lib.processing.FragmentShader
 import io.easyshaders.lib.processing.program.ProgramPipeline
 import io.easyshaders.lib.processing.util.GLUtils
 import io.easyshaders.lib.processing.util.InputFormat
@@ -209,11 +208,11 @@ class OpenGlRenderer {
         }
     }
 
-    fun setFragmentShader(source: String, beforeRender: PreFrameCallback) {
+    fun setFragmentShader(shader: FragmentShader) {
         GLUtils.checkInitializedOrThrow(isInitialized, true)
         GLUtils.checkGlThreadOrThrow(glThread)
 
-        currentProgram?.setFragmentShader(source, beforeRender)
+        currentProgram?.setFragmentShader(shader)
     }
 
     fun setProperty(name: String, value: Float) {

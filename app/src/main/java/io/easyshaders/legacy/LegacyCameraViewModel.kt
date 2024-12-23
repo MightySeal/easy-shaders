@@ -18,7 +18,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.CameraEffectManager
-import io.easyshaders.lib.processing.PreFrameCallback
+import io.easyshaders.lib.processing.FragmentShader
 import io.easyshaders.lib.processing.program.FragmentShaderProgram
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -96,10 +96,8 @@ class LegacyCameraViewModel @Inject constructor(
             delay(1500)
 
             cameraEffect.setEffectShaderSource(
-                loadShaderCode(application, "brightness_contrast.frag")
-            ) { shader: FragmentShaderProgram, frameCount: Int, width: Int, height: Int ->
-                // NO-OP
-            }
+                FragmentShader(loadShaderCode(application, "brightness_contrast.frag"))
+            )
 
             cameraEffect.setProperty("brightness", 0f)
             cameraEffect.setProperty("contrast", 1f)

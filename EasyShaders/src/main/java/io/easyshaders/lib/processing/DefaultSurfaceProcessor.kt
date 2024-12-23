@@ -153,9 +153,9 @@ class DefaultSurfaceProcessor(
         }
     }
 
-    fun setEffectShader(source: String, beforeRender: PreFrameCallback) {
+    fun setEffectShader(shader: FragmentShader) {
         executeSafely({
-            openGlRenderer.setFragmentShader(source, beforeRender)
+            openGlRenderer.setFragmentShader(shader)
         })
     }
 

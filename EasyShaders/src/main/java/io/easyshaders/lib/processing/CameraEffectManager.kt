@@ -18,8 +18,8 @@ class CameraEffectManager private constructor(
     errorListener
 ) {
 
-    fun setEffectShaderSource(shaderSource: String, beforeRender: PreFrameCallback) {
-        surfaceProcessor.setEffectShader(shaderSource, beforeRender)
+    fun setEffectShaderSource(shader: FragmentShader) {
+        surfaceProcessor.setEffectShader(shader)
     }
 
     fun setProperty(name: String, value: Float) {
