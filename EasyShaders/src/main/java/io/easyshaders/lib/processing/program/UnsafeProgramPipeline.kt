@@ -10,7 +10,7 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
     override val pipelineProgramId: ProgramId
 
     private var fragmentShaderUserHandle: FragmentShader = PASSTHROUGH
-    private var fragmentShader: UnsafeFragmentShader = UnsafeFragmentShader(fragmentShaderUserHandle.source)
+    private var fragmentShader: UnsafeFragmentShader = UnsafeFragmentShader(fragmentShaderUserHandle.source, fragmentShaderUserHandle.samplerName)
     private var frameCount = 0
 
     // Reference: https://www.khronos.org/opengl/wiki/Example/GLSL_Separate_Program_Basics
@@ -55,7 +55,7 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
 
     override fun setFragmentShader(shader: FragmentShader) {
         fragmentShaderUserHandle = shader
-        fragmentShader = UnsafeFragmentShader(shader.source)
+        fragmentShader = UnsafeFragmentShader(shader.source, shader.samplerName)
 
         GLES31.glUseProgramStages(pipelineProgramId.programHandle, GLES31.GL_FRAGMENT_SHADER_BIT, fragmentShader.shaderProgramId.handle)
         checkGlErrorOrThrow("newShader glUseProgramStages")
@@ -87,4 +87,4 @@ private val FRAGMENT_SHADER = """
     }
 """.trimIndent().trim()
 
-private val PASSTHROUGH = FragmentShader(FRAGMENT_SHADER)
+private val PASSTHROUGH = FragmentShader(FRAGMENT_SHADER, "sTexture")

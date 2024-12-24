@@ -11,7 +11,11 @@ internal data class UniformInfo(
     val size: Int
 )
 
-internal class UnsafeFragmentShader(val source: String): ShaderProgram, FragmentShaderProgram {
+// TODO: Try to infer the sampler name by type "samplerExternalOES"
+internal class UnsafeFragmentShader(
+    val source: String,
+    val samplerName: String
+): ShaderProgram, FragmentShaderProgram {
 
     private val props = mutableMapOf<String, UniformInfo>()
 
@@ -21,8 +25,7 @@ internal class UnsafeFragmentShader(val source: String): ShaderProgram, Fragment
     init {
         // TODO: Add an option to choose between eager/lazy initialization
         shaderProgramId = FragmentShaderProgramId(GLES31.glCreateShaderProgramv(GLES31.GL_FRAGMENT_SHADER, arrayOf(source)))
-
-        samplerLocation = GLES31.glGetUniformLocation(shaderProgramId.handle, "sTexture")
+        samplerLocation = GLES31.glGetUniformLocation(shaderProgramId.handle, samplerName)
         checkGlErrorOrThrow("fragmentShaderProgramId $shaderProgramId")
 
         val linkStatus = IntArray(1)

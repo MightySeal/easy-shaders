@@ -96,7 +96,7 @@ class LegacyCameraViewModel @Inject constructor(
             delay(1500)
 
             cameraEffect.setEffectShaderSource(
-                FragmentShader(loadShaderCode(application, "brightness_contrast.frag"))
+                FragmentShader(loadShaderCode(application, "brightness_contrast.frag"), "sTexture")
             )
 
             cameraEffect.setProperty("brightness", 0f)
