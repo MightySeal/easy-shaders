@@ -2,8 +2,8 @@ package io.easyshaders.lib.processing.program
 
 import android.opengl.GLES31
 import android.util.Log
-import io.easyshaders.lib.processing.util.GLUtils.TAG
 import io.easyshaders.lib.processing.util.GLUtils.checkGlErrorOrThrow
+import io.easyshaders.lib.processing.utils.TAG
 
 internal data class UniformInfo(
     val location: Int,
@@ -25,8 +25,7 @@ internal class UnsafeFragmentShader(
     init {
         // TODO: Add an option to choose between eager/lazy initialization
         shaderProgramId = FragmentShaderProgramId(GLES31.glCreateShaderProgramv(GLES31.GL_FRAGMENT_SHADER, arrayOf(source)))
-        samplerLocation = GLES31.glGetUniformLocation(shaderProgramId.handle, samplerName)
-        checkGlErrorOrThrow("fragmentShaderProgramId $shaderProgramId")
+        checkGlErrorOrThrow("glCreateShaderProgramv $shaderProgramId")
 
         val linkStatus = IntArray(1)
         GLES31.glGetProgramiv(shaderProgramId.handle, GLES31.GL_LINK_STATUS, linkStatus,  /*offset=*/0)
@@ -34,19 +33,53 @@ internal class UnsafeFragmentShader(
             Log.e(TAG, GLES31.glGetProgramInfoLog(shaderProgramId.handle))
         }
 
+        samplerLocation = GLES31.glGetUniformLocation(shaderProgramId.handle, samplerName)
+        checkGlErrorOrThrow("fragmentShaderProgramId $shaderProgramId $samplerName")
+
         props.putAll(loadProperties(shaderProgramId))
     }
 
-    fun dispose() {}
+    fun dispose() {
+        GLES31.glDeleteShader(shaderProgramId.handle)
+    }
 
     fun use() {
         GLES31.glProgramUniform1i(shaderProgramId.handle, samplerLocation, 0)
+        checkGlErrorOrThrow("glProgramUniform1i")
     }
 
     override fun setProperty(name: String, value: Float) {
         props[name]?.let { prop ->
             when (prop.type) {
                 GLES31.GL_FLOAT -> GLES31.glProgramUniform1f(shaderProgramId.handle, prop.location, value)
+                else -> Log.e(TAG, "Unsupported type: ${prop.type}")
+            }
+        }
+    }
+
+    override fun setProperty(name: String, value: Int) {
+        props[name]?.let { prop ->
+            when (prop.type) {
+                GLES31.GL_INT -> GLES31.glProgramUniform1i(shaderProgramId.handle, prop.location, value)
+                else -> Log.e(TAG, "Unsupported type: ${prop.type}")
+            }
+        }
+    }
+
+
+    override fun setVectorProperty(name: String, x: Float, y: Float) {
+        props[name]?.let { prop ->
+            when (prop.type) {
+                GLES31.GL_FLOAT_VEC2 -> GLES31.glProgramUniform2f(shaderProgramId.handle, prop.location, x, y)
+                else -> Log.e(TAG, "Unsupported type: ${prop.type}")
+            }
+        }
+    }
+
+    override fun setVectorProperty(name: String, x: Int, y: Int) {
+        props[name]?.let { prop ->
+            when (prop.type) {
+                GLES31.GL_INT_VEC2 -> GLES31.glProgramUniform2i(shaderProgramId.handle, prop.location, x, y)
                 else -> Log.e(TAG, "Unsupported type: ${prop.type}")
             }
         }

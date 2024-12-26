@@ -222,6 +222,13 @@ class OpenGlRenderer {
         currentProgram?.setProperty(name, value)
     }
 
+    fun setProperty(name: String, value: Int) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setProperty(name, value)
+    }
+
     private fun activateExternalTexture(externalTextureId: Int) {
         GLES31.glActiveTexture(GLES31.GL_TEXTURE0)
         GLUtils.checkGlErrorOrThrow("glActiveTexture")
@@ -467,7 +474,7 @@ class OpenGlRenderer {
         glThread = null
     }
 
-    protected fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
+    private fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
         check(
             outputSurfaceMap.containsKey(surface)
         ) { "The surface is not registered." }
@@ -475,7 +482,7 @@ class OpenGlRenderer {
         return outputSurfaceMap.getValue(surface)
     }
 
-    protected fun createOutputSurfaceInternal(surface: Surface): OutputSurface? {
+    private fun createOutputSurfaceInternal(surface: Surface): OutputSurface? {
         var eglSurface: EGLSurface?
         try {
             eglSurface = GLUtils.createWindowSurface(
@@ -494,7 +501,7 @@ class OpenGlRenderer {
         return OutputSurface.of(eglSurface, size.width, size.height)
     }
 
-    protected fun removeOutputSurfaceInternal(surface: Surface, unregister: Boolean) {
+    private fun removeOutputSurfaceInternal(surface: Surface, unregister: Boolean) {
         // Unmake current surface.
         if (currentSurface === surface) {
             currentSurface = null

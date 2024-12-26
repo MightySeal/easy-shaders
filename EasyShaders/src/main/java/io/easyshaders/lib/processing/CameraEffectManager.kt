@@ -26,6 +26,10 @@ class CameraEffectManager private constructor(
         surfaceProcessor.setProperty(name, value)
     }
 
+    fun setProperty(name: String, value: Int) {
+        surfaceProcessor.setProperty(name, value)
+    }
+
     override fun getSurfaceProcessor(): SurfaceProcessor {
         return surfaceProcessor
     }

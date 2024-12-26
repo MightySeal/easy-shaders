@@ -12,6 +12,7 @@ internal interface ProgramPipeline {
     fun setFragmentShader(shader: FragmentShader)
 
     fun setProperty(name: String, value: Float)
+    fun setProperty(name: String, value: Int)
     // TODO: More types
 
     companion object {

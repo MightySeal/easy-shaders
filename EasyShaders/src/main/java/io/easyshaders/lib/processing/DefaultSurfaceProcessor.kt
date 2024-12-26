@@ -165,6 +165,12 @@ class DefaultSurfaceProcessor(
         })
     }
 
+    fun setProperty(name: String, value: Int) {
+        executeSafely({
+            openGlRenderer.setProperty(name, value)
+        })
+    }
+
     @WorkerThread
     private fun checkReadyToRelease() {
         if (isReleased && inputSurfaceCount == 0) {

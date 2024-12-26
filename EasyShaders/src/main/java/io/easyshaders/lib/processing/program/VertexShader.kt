@@ -94,6 +94,10 @@ internal class VertexShader: ShaderProgram {
 
         checkGlErrorOrThrow("glUniformMatrix4fv")
     }
+
+    internal fun dispose() {
+        GLES31.glDeleteProgram(shaderProgramId.handle)
+    }
 }
 
 private val VERTEX_SHADER = """

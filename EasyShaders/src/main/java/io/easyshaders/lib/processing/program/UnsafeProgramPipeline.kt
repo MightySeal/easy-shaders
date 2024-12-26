@@ -40,7 +40,6 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
 
         vertexShader.use()
         fragmentShader.use()
-        checkGlErrorOrThrow("glProgramUniform1i")
         // Set to default value for single camera case
     }
 
@@ -51,6 +50,8 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
 
     override fun delete() {
         GLES31.glDeleteProgramPipelines(1, intArrayOf(pipelineProgramId.programHandle), 0)
+        vertexShader.dispose()
+        fragmentShader.dispose()
     }
 
     override fun setFragmentShader(shader: FragmentShader) {
@@ -62,10 +63,16 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
         fragmentShader.use()
         checkGlErrorOrThrow("newShader useInternal")
 
+        fragmentShaderUserHandle.onAttach(fragmentShader)
+
         frameCount = 0
     }
 
     override fun setProperty(name: String, value: Float) {
+        fragmentShader.setProperty(name, value)
+    }
+
+    override fun setProperty(name: String, value: Int) {
         fragmentShader.setProperty(name, value)
     }
 
