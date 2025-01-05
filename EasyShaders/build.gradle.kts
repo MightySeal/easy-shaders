@@ -25,6 +25,7 @@ android {
 dependencies {
 
     implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.core.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
