@@ -2,6 +2,7 @@ package io.easyshaders.legacy
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import android.util.Log
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
@@ -58,7 +59,7 @@ class LegacyCameraViewModel @Inject constructor(
     val uiState: Flow<LegacyCameraViewState>
         field = MutableStateFlow<LegacyCameraViewState>(LegacyCameraViewState.Loading)
 
-    private val _bitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
+    private val _bitmaps = MutableStateFlow<List<Photo>>(emptyList())
     val bitmaps = _bitmaps.asStateFlow()
 
     init {
@@ -94,11 +95,16 @@ class LegacyCameraViewModel @Inject constructor(
         }
     }
 
-    fun onTakePhoto(bitmap: Bitmap) {
-        _bitmaps.value += bitmap
+    fun onTakePhoto(bitmap: Bitmap, uri: Uri?) {
+        _bitmaps.value += Photo(bitmap, uri)
     }
 
     fun uploadImage(bitmap: Bitmap) {
 
     }
+
+    data class Photo(
+        val bitmap: Bitmap,
+        val uri: Uri?,
+    )
 }

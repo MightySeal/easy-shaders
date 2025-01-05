@@ -107,12 +107,11 @@ fun LegacyCameraScreen(
                     onImageCaptured = onImageCaptured,
                     controller = controller,
                     context = context,
-                    aspect = 0.75f,
                     viewModel = viewModel,
                     modifier = modifier
                 )
 
-                LaunchedEffect(cameraSelector) {
+                LaunchedEffect(previewView) {
                     val cameraProvider = context.getCameraProvider()
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
@@ -140,7 +139,6 @@ private fun LegacyCameraView(
     onImageCaptured: (Uri) -> Unit,
     controller: LifecycleCameraController,
     context: Context,
-    aspect: Float,
     viewModel: LegacyCameraViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -160,7 +158,7 @@ private fun LegacyCameraView(
             CameraPreview(
                 controller = controller,
                 modifier = Modifier
-                    .aspectRatio(aspect)
+                    .aspectRatio(0.75f)
                     .fillMaxSize()
             )
             Spacer(modifier = Modifier
@@ -201,7 +199,7 @@ private fun LegacyCameraView(
                         executor = executor,
                         onImageCaptured = onImageCaptured,
                         controller = controller,
-                        onPhotoTaken = viewModel::onTakePhoto,
+                        onPhotoTaken = {  },
                         context = context
                     )
                 },
