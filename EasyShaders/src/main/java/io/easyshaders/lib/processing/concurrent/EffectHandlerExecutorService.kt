@@ -1,21 +1,15 @@
 package io.easyshaders.lib.processing.concurrent
 
 import android.os.Handler
-import java.util.concurrent.AbstractExecutorService
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import android.os.HandlerThread
+import io.easyshaders.lib.processing.utils.TAG
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
-object LibExecutors {
-
-    fun newHandlerExecutor(handler: Handler): ExecutorService {
-        return HandlerExecutorService(handler)
-    }
-
-}
-
-class HandlerExecutorService(private val handler: Handler): AbstractExecutorService() {
+class EffectHandlerExecutorService private constructor(
+    private val glThread: HandlerThread,
+    override val handler: Handler
+): AbstractEffectHandlerExecutorService() {
 
     override fun execute(command: Runnable) {
         if (!handler.post(command)) {
@@ -45,5 +39,21 @@ class HandlerExecutorService(private val handler: Handler): AbstractExecutorServ
         unit: TimeUnit?
     ): Boolean {
         throw UnsupportedOperationException("Use Looper.quitSafely().")
+    }
+
+    fun quitThread() {
+        glThread.quit()
+    }
+
+    companion object Factory {
+        private val instance by lazy(::create)
+
+        fun instance(): EffectHandlerExecutorService = create()
+
+        private fun create(): EffectHandlerExecutorService {
+            val glThread: HandlerThread = HandlerThread(TAG + "GL Thread").also(HandlerThread::start)
+            val handler = Handler(glThread.looper)
+            return EffectHandlerExecutorService(glThread, handler)
+        }
     }
 }

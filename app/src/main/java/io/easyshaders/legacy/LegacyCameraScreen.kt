@@ -7,20 +7,30 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,14 +51,14 @@ fun LegacyCameraScreen(
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
     if (cameraPermissionState.status.isGranted) {
-        val state by viewModel.uiState.collectAsState(LegacyCameraViewState.Loading)
+        val state = viewModel.uiState.collectAsState(LegacyCameraViewState.Loading).value
 
         when (state) {
-            LegacyCameraViewState.Loading -> {
+            is LegacyCameraViewState.Loading -> {
                 // Show loading state
             }
 
-            LegacyCameraViewState.Ready -> {
+            is LegacyCameraViewState.Ready -> {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 val context = LocalContext.current
                 val previewView = remember { PreviewView(context) }
@@ -58,6 +68,13 @@ fun LegacyCameraScreen(
                     aspect = 0.75f,
                     modifier = modifier
                 )
+
+                OverlayControls(
+                    controls = state.controls,
+                    modifier = Modifier.padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+                ) {
+                    viewModel.onControlChange(it)
+                }
 
                 LaunchedEffect(previewView) {
                     viewModel.startPreview(
@@ -86,10 +103,11 @@ private fun LegacyCameraView(
     ) {
         Column {
 
-            Spacer(modifier = Modifier
-                .background(Color.Green)
-                .height(10.dp)
-                .background(Color.Blue)
+            Spacer(
+                modifier = Modifier
+                    .background(Color.Green)
+                    .height(10.dp)
+                    .background(Color.Blue)
             )
             AndroidView(
                 { previewView },
@@ -99,10 +117,11 @@ private fun LegacyCameraView(
             )
 
 
-            Spacer(modifier = Modifier
-                .background(Color.Red)
-                .height(10.dp)
-                .background(Color.Yellow)
+            Spacer(
+                modifier = Modifier
+                    .background(Color.Red)
+                    .height(10.dp)
+                    .background(Color.Yellow)
             )
 
         }
@@ -114,6 +133,75 @@ private fun LegacyCameraView(
         ) {
 
         }
+    }
+}
+
+@Composable
+private fun OverlayControls(
+    controls: List<Control>,
+    modifier: Modifier = Modifier,
+    onChange: (ControlValue) -> Unit
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        LazyColumn {
+            items(controls) { control ->
+                when (control) {
+                    is Control.FloatSeek -> {
+                        FloatSeekControl(control) {
+                            onChange(ControlValue.FloatValue(control.id, it))
+                        }
+                    }
+
+                    is Control.CheckBox -> {
+                        CheckBoxControl(control) {
+                            onChange(ControlValue.BooleanValue(control.id, it))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatSeekControl(control: Control.FloatSeek, onChange: (Float) -> Unit) {
+    var sliderPosition by remember { mutableFloatStateOf(control.initial) }
+
+    Column {
+        Text(
+            text = "${control.title}: ${"%.2f".format(sliderPosition)}",
+            modifier = Modifier.align(Alignment.Start),
+        )
+        Slider(
+            modifier = Modifier.width(300.dp),
+            value = sliderPosition,
+            valueRange = control.range,
+            onValueChange = {
+                sliderPosition = it
+                onChange(it)
+            }
+        )
+    }
+}
+
+@Composable
+private fun CheckBoxControl(control: Control.CheckBox, onChange: (Boolean) -> Unit) {
+    var checkboxState by remember { mutableStateOf(false) }
+    Row {
+        Checkbox(
+            checked = checkboxState,
+            onCheckedChange = { enabled ->
+                checkboxState = enabled
+                onChange(enabled)
+            },
+            modifier = Modifier.align(Alignment.CenterVertically),
+        )
+        Text(
+            text = control.title,
+            modifier = Modifier.align(Alignment.CenterVertically),
+        )
     }
 }
 

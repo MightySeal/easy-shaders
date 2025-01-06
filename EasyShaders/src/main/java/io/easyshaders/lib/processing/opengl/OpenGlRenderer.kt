@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.easyshaders.lib.processing
+package io.easyshaders.lib.processing.opengl
 
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -27,7 +27,7 @@ import android.util.Log
 import android.view.Surface
 import androidx.annotation.WorkerThread
 import androidx.camera.core.DynamicRange
-import io.easyshaders.lib.processing.program.FragmentShader
+import io.easyshaders.lib.processing.FragmentShader
 import io.easyshaders.lib.processing.program.ProgramPipeline
 import io.easyshaders.lib.processing.util.GLUtils
 import io.easyshaders.lib.processing.util.InputFormat
@@ -55,13 +55,14 @@ class OpenGlRenderer {
     private var glThread: Thread? = null
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
+    private var eglShareContext: EGLContext = EGL14.EGL_NO_CONTEXT
     private var surfaceAttrib: IntArray = GLUtils.EMPTY_ATTRIBS
     private var eglConfig: EGLConfig? = null
     private var tempSurface: EGLSurface = EGL14.EGL_NO_SURFACE
     private var currentSurface: Surface? = null
     private var pipelineHandles: Map<InputFormat, ProgramPipeline> = mutableMapOf()
     private var currentProgram: ProgramPipeline? = null // TODO: use default? Make no-op implementation?
-    private var currentInputformat: InputFormat = InputFormat.UNKNOWN // TODO: use unknown?
+    private var currentInputformat: InputFormat = InputFormat.UNKNOWN
 
     private var externalTextureId = -1
 
@@ -208,8 +209,24 @@ class OpenGlRenderer {
     }
 
     fun setFragmentShader(shader: FragmentShader) {
-        TODO("Implement safeguarding against")
-        currentProgram?.fragmentShader = shader
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setFragmentShader(shader)
+    }
+
+    fun setProperty(name: String, value: Float) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setProperty(name, value)
+    }
+
+    fun setProperty(name: String, value: Int) {
+        GLUtils.checkInitializedOrThrow(isInitialized, true)
+        GLUtils.checkGlThreadOrThrow(glThread)
+
+        currentProgram?.setProperty(name, value)
     }
 
     private fun activateExternalTexture(externalTextureId: Int) {
@@ -258,7 +275,7 @@ class OpenGlRenderer {
         // TODO(b/245855601): Upload the matrix to GPU when textureTransform is changed.
         val program = checkNotNull(currentProgram)
         program.updateTextureMatrix(textureTransform)
-        program.onBeforeDraw()
+        program.onBeforeDraw(outputSurface!!.width, outputSurface.height)
 
         // Draw the rect.
         GLES31.glDrawArrays(GLES31.GL_TRIANGLE_STRIP,  /*firstVertex=*/0,  /*vertexCount=*/4)
@@ -357,9 +374,16 @@ class OpenGlRenderer {
             eglDisplay, config, EGL14.EGL_NO_CONTEXT,
             attribToCreateContext, 0
         )
+
+        val shareContext = EGL14.eglCreateContext(
+            eglDisplay, config, context,
+            attribToCreateContext, 0
+        )
+
         GLUtils.checkEglErrorOrThrow("eglCreateContext")
         eglConfig = config
         eglContext = context
+        eglShareContext = shareContext
 
         // Confirm with query.
         val values = IntArray(1)
@@ -450,7 +474,7 @@ class OpenGlRenderer {
         glThread = null
     }
 
-    protected fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
+    private fun getOutSurfaceOrThrow(surface: Surface): OutputSurface {
         check(
             outputSurfaceMap.containsKey(surface)
         ) { "The surface is not registered." }
@@ -458,7 +482,7 @@ class OpenGlRenderer {
         return outputSurfaceMap.getValue(surface)
     }
 
-    protected fun createOutputSurfaceInternal(surface: Surface): OutputSurface? {
+    private fun createOutputSurfaceInternal(surface: Surface): OutputSurface? {
         var eglSurface: EGLSurface?
         try {
             eglSurface = GLUtils.createWindowSurface(
@@ -477,7 +501,7 @@ class OpenGlRenderer {
         return OutputSurface.of(eglSurface, size.width, size.height)
     }
 
-    protected fun removeOutputSurfaceInternal(surface: Surface, unregister: Boolean) {
+    private fun removeOutputSurfaceInternal(surface: Surface, unregister: Boolean) {
         // Unmake current surface.
         if (currentSurface === surface) {
             currentSurface = null

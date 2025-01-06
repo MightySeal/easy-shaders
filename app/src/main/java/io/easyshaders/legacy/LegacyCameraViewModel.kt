@@ -17,10 +17,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.easyshaders.lib.processing.DefaultCameraEffect
+import io.easyshaders.lib.processing.CameraEffectManager
+import io.easyshaders.lib.processing.FragmentShader
+import io.easyshaders.lib.processing.program.FragmentShaderProgram
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,16 +53,25 @@ class LegacyCameraViewModel @Inject constructor(
         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
         .build()
 
+    private val useCaseBuilder by lazy {
+        UseCaseGroup.Builder()
+            .addUseCase(imageCaptureUseCase)
+            .addUseCase(previewUseCase)
+    }
+
     val uiState: Flow<LegacyCameraViewState>
         field = MutableStateFlow<LegacyCameraViewState>(LegacyCameraViewState.Loading)
 
     init {
         viewModelScope.launch {
             cameraProvider = ProcessCameraProvider.getInstance(application).await()
-            uiState.emit(LegacyCameraViewState.Ready)
+            uiState.emit(LegacyCameraViewState.Ready())
         }
     }
 
+    private val cameraEffect: CameraEffectManager by lazy {
+        CameraEffectManager.create()
+    }
 
     fun startPreview(
         lifecycleOwner: LifecycleOwner,
@@ -65,11 +79,8 @@ class LegacyCameraViewModel @Inject constructor(
     ) {
         cameraProvider.unbindAll()
 
-        val useCaseGroup = UseCaseGroup.Builder()
-            // .setViewPort(previewView.viewPort!!)
-            .addUseCase(imageCaptureUseCase)
-            .addUseCase(previewUseCase)
-            .addEffect(DefaultCameraEffect.create())
+        val useCaseGroup = useCaseBuilder
+            .addEffect(cameraEffect)
             .build()
 
         camera = cameraProvider.bindToLifecycle(
@@ -79,8 +90,59 @@ class LegacyCameraViewModel @Inject constructor(
         )
 
         previewUseCase.surfaceProvider = surfaceProvider
+
+
         viewModelScope.launch {
-            // uiState.emit(LegacyCameraViewState.Active)
+            delay(1500)
+
+            cameraEffect.setEffectShaderSource(
+                FragmentShader(loadShaderCode(application, "brightness_contrast.frag"), "sTexture")
+            )
+
+            cameraEffect.setProperty("brightness", 0f)
+            cameraEffect.setProperty("contrast", 1f)
+
+            uiState.emit(
+                LegacyCameraViewState.Ready(
+                    controls = listOf(
+                        Control.FloatSeek(
+                            title = "Brightness",
+                            id = "brightness",
+                            range = -1f..1f,
+                            initial = 0f,
+                            step = 0.01f
+                        ),
+                        Control.FloatSeek(
+                            title = "Contrast",
+                            id = "contrast",
+                            range = -1f..1f,
+                            initial = 0f,
+                            step = 0.01f
+                        )
+                    )
+                )
+            )
+        }
+    }
+
+    fun onControlChange(change: ControlValue) {
+        when (change) {
+            is ControlValue.FloatValue -> {
+                when (change.id) {
+                    "brightness" -> cameraEffect.setProperty("brightness", change.value)
+                    "contrast" -> cameraEffect.setProperty("contrast", change.value + 1f)
+                }
+            }
+
+            is ControlValue.BooleanValue -> {}
+        }
+    }
+
+    private suspend fun loadShaderCode(context: Context, shaderName: String): String {
+        return withContext(Dispatchers.IO) {
+            context.assets.open("shaders/$shaderName").use { inputStream ->
+                inputStream.bufferedReader().readText()
+            }
         }
     }
 }
