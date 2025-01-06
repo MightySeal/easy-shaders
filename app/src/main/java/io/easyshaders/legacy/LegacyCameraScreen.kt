@@ -10,12 +10,18 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
+import androidx.camera.view.video.AudioConfig
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,15 +44,20 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -58,6 +69,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,11 +82,16 @@ fun LegacyCameraScreen(
     val controller = remember {
         LifecycleCameraController(context).apply {
             CameraController.IMAGE_CAPTURE
+            CameraController.VIDEO_CAPTURE
         }
     }
     val scope = rememberCoroutineScope()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val gallery by viewModel.gallery.collectAsState()
+    val isVideo = remember { mutableStateOf(false) }
+    val recording by remember { mutableStateOf<Recording?>(null) }
+    val isRecording by remember { mutableStateOf(false) }
+    val zoom = remember { mutableFloatStateOf(1.0f) }
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
@@ -97,7 +114,7 @@ fun LegacyCameraScreen(
         }
     ) { padding ->
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding),
             contentAlignment = Alignment.Center
@@ -107,25 +124,69 @@ fun LegacyCameraScreen(
                     modifier = Modifier
                         .height(10.dp)
                 )
-                io.easyshaders.legacy.CameraPreview(
-                    modifier = Modifier
-                        .aspectRatio(0.75f)
-                        .fillMaxSize(),
-                    controller = controller
-                )
+                Box {
+                    CameraPreview(
+                        modifier = Modifier
+                            .aspectRatio(0.75f)
+                            .fillMaxSize(),
+                        controller = controller
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Button(
+                            modifier = Modifier.padding(end = 8.dp),
+                            shape = CircleShape,
+                            onClick = {
+                                controller.setZoomRatio(1.0f)
+                                zoom.value = 1.0f
+                            },
+                            elevation = null,
+                            colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (zoom.value == 1.0f) Color.White else Color.Transparent,
+                                contentColor = if (zoom.value == 1.0f) Color.Black else Color.White,
+                            )
+                        ) {
+                            Text("1.0")
+                        }
+                        Button(
+                            shape = CircleShape,
+                            onClick = {
+                                controller.setZoomRatio(2.0f)
+                                zoom.value = 2.0f
+                            },
+                            elevation = null,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (zoom.value == 2.0f) Color.White else Color.Transparent,
+                                contentColor = if (zoom.value == 2.0f) Color.Black else Color.White,
+                            )
+                        ) {
+                            Text("2.0")
+                        }
+                    }
+                }
                 Spacer(
                     modifier = Modifier
                         .height(10.dp)
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = { controller.setZoomRatio(1.0f) }) {
-                        Text("Zoom 1.0")
+                    Button(onClick = { isVideo.value = false }) {
+                        Text("Photo")
                     }
-                    Button(onClick = { controller.setZoomRatio(2.0f) }) {
-                        Text("Zoom 2.0")
+                    Button(
+                        onClick = {
+                            // isVideo.value = true
+                        },
+                        enabled = false
+                    ) {
+                        Text("Video")
                     }
                 }
                 Row(
@@ -149,26 +210,28 @@ fun LegacyCameraScreen(
                     }
                     Button(
                         onClick = {
-                            takePicture(
-                                controller = controller,
-                                context = context,
-                                onSave = {
-                                    viewModel.onTakePhoto(it)
-                                }
-                            )
+                            if (isVideo.value) {
+
+                            }
+                            else {
+                                takePicture(
+                                    controller = controller,
+                                    context = context,
+                                    onSave = {
+                                        viewModel.onTakePhoto(it)
+                                    }
+                                )
+                            }
                         },
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalContentColor.current),
                         modifier = Modifier
                             .height(75.dp)
                             .width(75.dp),
                     ) {}
                     IconButton(
                         onClick = {
-                            controller.cameraSelector =
-                                if (controller.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
-                                    CameraSelector.DEFAULT_FRONT_CAMERA
-                                } else CameraSelector.DEFAULT_BACK_CAMERA
+                            switchCamera(controller)
                         },
                         modifier = Modifier
                             .offset(16.dp, 16.dp)
@@ -185,7 +248,18 @@ fun LegacyCameraScreen(
     }
 }
 
-fun takePicture(
+private fun switchCamera(
+    controller: LifecycleCameraController,
+) {
+    controller.cameraSelector =
+        if (controller.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+}
+
+private fun takePicture(
     controller: LifecycleCameraController,
     context: Context,
     onSave: (picture: LegacyCameraViewModel.LocalPicture) -> Unit = {}
@@ -261,4 +335,11 @@ fun takePicture(
             }
         }
     )
+}
+
+private fun recordVideo(
+    controller: LifecycleCameraController,
+    context: Context,
+) {
+
 }
