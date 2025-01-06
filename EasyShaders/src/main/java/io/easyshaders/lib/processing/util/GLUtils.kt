@@ -149,7 +149,7 @@ object GLUtils {
         return eglSurface
     }
 
-    fun createPipelines(
+    internal fun createPipelines(
         dynamicRange: DynamicRange,
     ): Map<InputFormat, ProgramPipeline> {
         return InputFormat.entries
