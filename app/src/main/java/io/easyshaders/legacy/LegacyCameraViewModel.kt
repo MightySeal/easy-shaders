@@ -21,7 +21,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.easyshaders.lib.processing.CameraEffectManager
 import io.easyshaders.lib.processing.FragmentShader
-import io.easyshaders.lib.processing.program.FragmentShaderProgram
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow

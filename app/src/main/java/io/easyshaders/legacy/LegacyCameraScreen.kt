@@ -43,6 +43,7 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -54,7 +55,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import androidx.core.net.toUri
@@ -81,14 +82,6 @@ fun LegacyCameraScreen(
     modifier: Modifier,
     viewModel: LegacyCameraViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
-
-    val controller = remember {
-        LifecycleCameraController(context).apply {
-            CameraController.IMAGE_CAPTURE
-            CameraController.VIDEO_CAPTURE
-        }
-    }
     val scope = rememberCoroutineScope()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val gallery by viewModel.gallery.collectAsState()
@@ -110,7 +103,18 @@ fun LegacyCameraScreen(
             is LegacyCameraViewState.Ready -> {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 val context = LocalContext.current
-                val previewView = remember { PreviewView(context) }
+                val controller = remember {
+                    LifecycleCameraController(context).apply {
+                        CameraController.IMAGE_CAPTURE
+                        CameraController.VIDEO_CAPTURE
+                    }
+                }
+                val previewView = remember {
+                    PreviewView(context).apply {
+                        this.controller = controller
+                        controller.bindToLifecycle(lifecycleOwner)
+                    }
+                }
 
                 BottomSheetScaffold(
                     scaffoldState = scaffoldState,
@@ -144,11 +148,11 @@ fun LegacyCameraScreen(
                                     .height(10.dp)
                             )
                             Box {
-                                CameraPreview(
+                                AndroidView(
+                                    { previewView },
                                     modifier = Modifier
                                         .aspectRatio(0.75f)
-                                        .fillMaxSize(),
-                                    controller = controller
+                                        .fillMaxSize()
                                 )
                                 Row(
                                     modifier = Modifier
