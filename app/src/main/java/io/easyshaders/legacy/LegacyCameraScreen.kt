@@ -18,6 +18,12 @@ import androidx.camera.video.Recording
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import android.Manifest
+import androidx.camera.core.AspectRatio
+import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +63,7 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,15 +73,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import io.easyshaders.lib.processing.CameraEffectManager
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -82,6 +94,9 @@ fun LegacyCameraScreen(
     modifier: Modifier,
     viewModel: LegacyCameraViewModel = hiltViewModel(),
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+
     val scope = rememberCoroutineScope()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val gallery by viewModel.gallery.collectAsState()
@@ -89,6 +104,28 @@ fun LegacyCameraScreen(
     val recording by remember { mutableStateOf<Recording?>(null) }
     val isRecording by remember { mutableStateOf(false) }
     val zoom = remember { mutableFloatStateOf(1.0f) }
+
+    val imageCapture: ImageCapture = remember { ImageCapture.Builder().build() }
+    val executor = Executors.newSingleThreadExecutor()
+    val cameraSelector = CameraSelector.Builder()
+        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+        .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+        .build()
+    val aspectRatioStrategy =
+        AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_NONE)
+    val resolutionSelector = ResolutionSelector.Builder()
+        .setAspectRatioStrategy(aspectRatioStrategy)
+        .build()
+    val previewUseCase = Preview.Builder()
+        .setResolutionSelector(resolutionSelector)
+        .build()
+
+//    val previewView = remember {
+//        PreviewView(context).apply {
+//            this.controller = controller
+//            controller.bindToLifecycle(lifecycleOwner)
+//        }
+//    }
 
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
@@ -101,18 +138,41 @@ fun LegacyCameraScreen(
             }
 
             is LegacyCameraViewState.Ready -> {
-                val lifecycleOwner = LocalLifecycleOwner.current
-                val context = LocalContext.current
+                val previewView = remember {
+                    PreviewView(context)
+                }
+
+                /*LaunchedEffect(previewView) {
+                    viewModel.startPreview(
+                        lifecycleOwner = lifecycleOwner,
+                        surfaceProvider = previewView.surfaceProvider
+                    )
+                }*/
+
+                /*LaunchedEffect(CameraSelector.LENS_FACING_BACK) {
+                    val cameraProvider = suspendCoroutine<ProcessCameraProvider> { continuation ->
+                        ProcessCameraProvider.getInstance(context).also { cameraProvider ->
+                            cameraProvider.addListener({
+                                continuation.resume(cameraProvider.get())
+                            }, executor)
+                        }
+                    }
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        previewUseCase,
+                        useCaseGroup
+                    )
+                    previewUseCase.surfaceProvider = previewView.surfaceProvider
+                }*/
+
                 val controller = remember {
                     LifecycleCameraController(context).apply {
-                        CameraController.IMAGE_CAPTURE
-                        CameraController.VIDEO_CAPTURE
-                    }
-                }
-                val previewView = remember {
-                    PreviewView(context).apply {
-                        this.controller = controller
-                        controller.bindToLifecycle(lifecycleOwner)
+                        setEnabledUseCases(CameraController.IMAGE_CAPTURE)
+                        bindToLifecycle(lifecycleOwner)
+
+                        previewView.controller = this
                     }
                 }
 
@@ -234,7 +294,7 @@ fun LegacyCameraScreen(
                                 Button(
                                     onClick = {
                                         if (isVideo.value) {
-
+                                            // TODO
                                         }
                                         else {
                                             takePicture(
@@ -275,13 +335,6 @@ fun LegacyCameraScreen(
                     modifier = Modifier.padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
                 ) {
                     viewModel.onControlChange(it)
-                }
-
-                LaunchedEffect(previewView) {
-                    viewModel.startPreview(
-                        lifecycleOwner = lifecycleOwner,
-                        surfaceProvider = previewView.surfaceProvider
-                    )
                 }
             }
         }

@@ -80,7 +80,8 @@ class LegacyCameraViewModel @Inject constructor(
 
     fun startPreview(
         lifecycleOwner: LifecycleOwner,
-        surfaceProvider: Preview.SurfaceProvider
+        surfaceProvider: Preview.SurfaceProvider,
+        selector: CameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
     ) {
         cameraProvider.unbindAll()
 
@@ -90,8 +91,8 @@ class LegacyCameraViewModel @Inject constructor(
 
         camera = cameraProvider.bindToLifecycle(
             lifecycleOwner = lifecycleOwner,
-            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA,
-            useCaseGroup = useCaseGroup,
+            cameraSelector = selector,
+            useCaseGroup = useCaseGroup
         )
 
         previewUseCase.surfaceProvider = surfaceProvider
