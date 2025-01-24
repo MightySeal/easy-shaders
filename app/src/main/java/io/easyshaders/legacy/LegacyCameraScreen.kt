@@ -62,6 +62,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -75,9 +76,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
-import java.util.concurrent.Executors
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun LegacyCameraScreen(
     modifier: Modifier,
@@ -86,186 +86,200 @@ fun LegacyCameraScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
 
-    val scope = rememberCoroutineScope()
-    val scaffoldState = rememberBottomSheetScaffoldState()
-    val gallery by viewModel.gallery.collectAsState()
-    val isVideo = remember { mutableStateOf(false) }
-    val recording by remember { mutableStateOf<Recording?>(null) }
-    val isRecording by remember { mutableStateOf(false) }
-    val zoom = remember { mutableFloatStateOf(1.0f) }
-
     val cameraEffectManager = CameraEffectManager.create()
     val previewView = remember { PreviewView(context) }
+    val gallery by viewModel.gallery.collectAsState()
 
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
     if (cameraPermissionState.status.isGranted) {
         val controller = remember {
-                    LifecycleCameraController(context).apply {
-                        setEnabledUseCases(CameraController.IMAGE_CAPTURE)
-                        bindToLifecycle(lifecycleOwner)
+            LifecycleCameraController(context).apply {
+                setEnabledUseCases(CameraController.IMAGE_CAPTURE)
+                bindToLifecycle(lifecycleOwner)
 
-                        previewView.controller = this
-                    }
-                }
+                previewView.controller = this
+            }
+        }
 
         controller.setEffects(setOf(cameraEffectManager))
 
-        BottomSheetScaffold(
-            scaffoldState = scaffoldState,
-            sheetPeekHeight = 0.dp,
-            sheetContent = {
-                PhotoBottomSheetContent(
-                    gallery = gallery,
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    onClick = {
-                        val intent = Intent()
-                        intent.setAction(Intent.ACTION_VIEW)
-                        intent.setDataAndType(
-                            it,
-                            "image/*"
-                        )
-                        startActivity(context, intent, null)
-                    }
-                )
-            }
-        ) { padding ->
-            Box(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column {
-                    Spacer(
-                        modifier = Modifier
-                            .height(10.dp)
+        LegacyCameraView(
+            modifier = modifier,
+            context = context,
+            controller = controller,
+            previewView = previewView,
+            gallery = gallery,
+            onTakePhoto = viewModel::onTakePhoto
+        )
+    } else {
+        CameraPermission(cameraPermissionState)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LegacyCameraView(
+    modifier: Modifier,
+    context: Context,
+    controller: LifecycleCameraController,
+    previewView: PreviewView,
+    gallery: List<LegacyCameraViewModel.LocalPicture>,
+    onTakePhoto: (LegacyCameraViewModel.LocalPicture) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val scaffoldState = rememberBottomSheetScaffoldState()
+    val zoom = remember { mutableFloatStateOf(1.0f) }
+    val isVideo = remember { mutableStateOf(false) }
+
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 0.dp,
+        sheetContent = {
+            PhotoBottomSheetContent(
+                gallery = gallery,
+                modifier = Modifier
+                    .fillMaxWidth(),
+                onClick = {
+                    val intent = Intent()
+                    intent.setAction(Intent.ACTION_VIEW)
+                    intent.setDataAndType(
+                        it,
+                        "image/*"
                     )
-                    Box {
-                        AndroidView(
-                            { previewView },
-                            modifier = Modifier
-                                .aspectRatio(0.75f)
-                                .fillMaxSize()
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Button(
-                                modifier = Modifier.padding(end = 8.dp),
-                                shape = CircleShape,
-                                onClick = {
-                                    controller.setZoomRatio(1.0f)
-                                    zoom.value = 1.0f
-                                },
-                                elevation = null,
-                                colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = if (zoom.value == 1.0f) Color.White else Color.Transparent,
-                                    contentColor = if (zoom.value == 1.0f) Color.Black else Color.White,
-                                )
-                            ) {
-                                Text("1.0")
-                            }
-                            Button(
-                                shape = CircleShape,
-                                onClick = {
-                                    controller.setZoomRatio(2.0f)
-                                    zoom.value = 2.0f
-                                },
-                                elevation = null,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (zoom.value == 2.0f) Color.White else Color.Transparent,
-                                    contentColor = if (zoom.value == 2.0f) Color.Black else Color.White,
-                                )
-                            ) {
-                                Text("2.0")
-                            }
-                        }
-                    }
-                    Spacer(
+                    startActivity(context, intent, null)
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box {
+                    AndroidView(
+                        { previewView },
                         modifier = Modifier
-                            .height(10.dp)
+                            .aspectRatio(0.75f)
+                            .fillMaxSize()
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Button(onClick = { isVideo.value = false }) {
-                            Text("Photo")
-                        }
                         Button(
-                            onClick = {
-                                // isVideo.value = true
-                            },
-                            enabled = false
-                        ) {
-                            Text("Video")
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    scaffoldState.bottomSheetState.expand()
-                                }
-                            },
-                            modifier = Modifier
-                                .offset(16.dp, 16.dp)
-                                .padding(bottom = 16.dp, end = 16.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PhotoLibrary,
-                                contentDescription = "Open Library"
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                if (isVideo.value) {
-                                    // TODO
-                                }
-                                else {
-                                    takePicture(
-                                        controller = controller,
-                                        context = context,
-                                        onSave = {
-                                            viewModel.onTakePhoto(it)
-                                        }
-                                    )
-                                }
-                            },
+                            modifier = Modifier.padding(end = 8.dp),
                             shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(containerColor = LocalContentColor.current),
-                            modifier = Modifier
-                                .height(75.dp)
-                                .width(75.dp),
-                        ) {}
-                        IconButton(
                             onClick = {
-                                switchCamera(controller)
+                                controller.setZoomRatio(1.0f)
+                                zoom.floatValue = 1.0f
                             },
-                            modifier = Modifier
-                                .offset(16.dp, 16.dp)
-                                .padding(bottom = 16.dp, end = 16.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Cameraswitch,
-                                contentDescription = "Switch camera"
+                            elevation = null,
+                            colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (zoom.floatValue == 1.0f) Color.White else Color.Transparent,
+                                contentColor = if (zoom.floatValue == 1.0f) Color.Black else Color.White,
                             )
+                        ) {
+                            Text("1.0")
+                        }
+                        Button(
+                            shape = CircleShape,
+                            onClick = {
+                                controller.setZoomRatio(2.0f)
+                                zoom.floatValue = 2.0f
+                            },
+                            elevation = null,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (zoom.floatValue == 2.0f) Color.White else Color.Transparent,
+                                contentColor = if (zoom.floatValue == 2.0f) Color.Black else Color.White,
+                            )
+                        ) {
+                            Text("2.0")
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(onClick = { isVideo.value = false }) {
+                        Text("Photo")
+                    }
+                    Button(
+                        onClick = {
+                            // isVideo.value = true
+                        },
+                        enabled = false
+                    ) {
+                        Text("Video")
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    ControlButton(
+                        icon = Icons.Default.PhotoLibrary,
+                        description = "Open Library",
+                        onClick = { scope.launch {
+                            scaffoldState.bottomSheetState.expand()
+                        } },
+                    )
+                    Button(
+                        onClick = {
+                            if (isVideo.value) {
+                                // TODO
+                            } else {
+                                takePicture(
+                                    controller = controller,
+                                    context = context,
+                                    onSave = {
+                                        onTakePhoto(it)
+                                    }
+                                )
+                            }
+                        },
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalContentColor.current),
+                        modifier = Modifier
+                            .height(75.dp)
+                            .width(75.dp),
+                    ) {}
+                    ControlButton(
+                        icon = Icons.Default.Cameraswitch,
+                        description = "Switch camera",
+                        onClick = { switchCamera(controller) },
+                    )
+                }
             }
         }
-    } else {
-        CameraPermission(cameraPermissionState)
+    }
+}
+
+@Composable
+fun ControlButton(
+    icon: ImageVector,
+    description: String = "",
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = { onClick() },
+        modifier = Modifier
+            .offset(16.dp, 16.dp)
+            .padding(bottom = 16.dp, end = 16.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description
+        )
     }
 }
 

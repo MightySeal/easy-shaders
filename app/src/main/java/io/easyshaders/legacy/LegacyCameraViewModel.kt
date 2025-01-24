@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
@@ -15,11 +16,11 @@ class LegacyCameraViewModel @Inject constructor(
     @ApplicationContext private val application: Context,
 ) : ViewModel() {
 
-    private val _gallery = MutableStateFlow<List<LocalPicture>>(emptyList())
-    val gallery = _gallery.asStateFlow()
+    val gallery: StateFlow<List<LocalPicture>>
+        field = MutableStateFlow<List<LocalPicture>>(emptyList())
 
     fun onTakePhoto(picture: LocalPicture) {
-        _gallery.value += picture
+        gallery.value += picture
     }
 
     data class LocalPicture(
