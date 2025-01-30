@@ -29,6 +29,20 @@ android {
     }
 }
 
+publishing {
+    publications {
+        register<MavenPublication>("release") {
+            groupId = "io.easyshaders"
+            artifactId = "lib"
+            version = "0.0.1-alpha03"
+
+            afterEvaluate {
+                from(components["release"])
+            }
+        }
+    }
+}
+
 dependencies {
 
     implementation(libs.androidx.camera.core)
