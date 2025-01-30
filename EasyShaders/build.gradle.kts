@@ -34,7 +34,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "io.easyshaders"
             artifactId = "lib"
-            version = "0.0.1-alpha03"
+            version = "0.0.1-alpha04"
 
             afterEvaluate {
                 from(components["release"])
