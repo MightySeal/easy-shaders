@@ -418,6 +418,8 @@ class OpenGlRenderer {
         val program = pipelineHandles[currentInputformat]
         checkNotNull(program) { "Unable to configure program for input format: $currentInputformat" }
         if (currentProgram !== program) {
+
+            currentProgram?.getFragmentShader()?.let(program::setFragmentShader)
             currentProgram = program
             currentProgram!!.use()
         }

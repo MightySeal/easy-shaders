@@ -10,6 +10,7 @@ internal interface ProgramPipeline {
     fun onBeforeDraw(width: Int, height: Int)
     fun delete()
     fun setFragmentShader(shader: FragmentShader)
+    fun getFragmentShader(): FragmentShader
 
     fun setProperty(name: String, value: Float)
     fun setProperty(name: String, value: Int)

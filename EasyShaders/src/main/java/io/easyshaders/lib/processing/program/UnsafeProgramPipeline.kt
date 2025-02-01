@@ -68,6 +68,8 @@ internal class UnsafeProgramPipeline: ProgramPipeline {
         frameCount = 0
     }
 
+    override fun getFragmentShader(): FragmentShader = fragmentShaderUserHandle
+
     override fun setProperty(name: String, value: Float) {
         fragmentShader.setProperty(name, value)
     }
