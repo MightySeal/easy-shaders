@@ -31,5 +31,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: | 
-            ./shaderfoundry/build/outputs/aar/shader-foundry-debug.aar
-            ./shaderfoundry/build/outputs/aar/shader-foundry-release.aar
+            ./shader-foundry/build/outputs/aar/shader-foundry-debug.aar
+            ./shader-foundry/build/outputs/aar/shader-foundry-release.aar
