@@ -9,18 +9,18 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
-        android:name=".CameraApp"
+        android:name="io.shaderfoundry.demo.CameraApp"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EasyShaders"
+        android:theme="@style/Theme.ShaderFoundry"
         tools:targetApi="31">
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="io.easyshaders.fileprovider"
+            android:authorities="io.shaderfoundry.fileprovider"
             android:grantUriPermissions="true"
             android:exported="false">
             <meta-data
@@ -28,10 +28,9 @@
                 android:resource="@xml/filepaths" />
         </provider>
         <activity
-            android:name=".MainActivity"
+            android:name="io.shaderfoundry.demo.MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.EasyShaders">
+            android:theme="@style/Theme.ShaderFoundry">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

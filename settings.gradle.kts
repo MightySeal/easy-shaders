@@ -20,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "EasyShaders"
+rootProject.name = "ShaderFoundry"
 include(":app")
-include(":EasyShaders")
+include(":shader-foundry")

@@ -25,11 +25,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run tests with Gradle
-        run: ./gradlew :EasyShaders:build
+        run: ./gradlew :shader-foundry:build
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: | 
-            ./EasyShaders/build/outputs/aar/EasyShaders-debug.aar
-            ./EasyShaders/build/outputs/aar/EasyShaders-release.aar
+            ./shaderfoundry/build/outputs/aar/shader-foundry-debug.aar
+            ./shaderfoundry/build/outputs/aar/shader-foundry-release.aar

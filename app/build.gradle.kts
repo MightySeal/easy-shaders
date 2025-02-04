@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "io.easyshaders"
+    namespace = "io.shaderfoundry.demo"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.easyshaders"
+        applicationId = "io.shaderfoundry.demo"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -72,8 +72,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
-
-    implementation(project(":EasyShaders"))
+    implementation(project(":shader-foundry"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
